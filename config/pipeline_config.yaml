@@ -1,0 +1,111 @@
+# SDLC Factory — Pipeline Configuration
+# Copy to sdlc_config.yaml and customise.
+
+pipeline:
+  # Default model for all agents (override per-role in agents section)
+  model: claude-sonnet-4-6
+  # Default iteration cap per agent turn
+  max_iterations_per_agent: 30
+  # Where to write generated code and artifacts
+  workspace: ./output
+  # Save SQLite DB to
+  db_path: ~/.sdlc-factory/pipeline.db
+  # Persist a checkpoint after each stage (enables resume on crash)
+  checkpoint: true
+
+# Per-role overrides — model, toolsets, iterations
+agents:
+  architect:
+    model: claude-opus-4-7          # use strongest model for design
+    max_iterations: 50
+
+  domain_expert:
+    max_iterations: 20
+
+  product_owner:
+    max_iterations: 20
+
+  business_analyst:
+    max_iterations: 25
+
+  tech_lead:
+    max_iterations: 30
+
+  developer_backend:
+    max_iterations: 30
+    toolsets: [read_file, write_file, patch, terminal, search_files]
+
+  developer_ui:
+    max_iterations: 30
+    toolsets: [read_file, write_file, patch, terminal, browser_navigate, browser_snapshot]
+
+  developer_devops:
+    max_iterations: 25
+    toolsets: [read_file, write_file, patch, terminal, search_files]
+
+  qa_engineer:
+    max_iterations: 40
+    toolsets: [read_file, write_file, terminal, execute_code, search_files]
+
+  release_manager:
+    max_iterations: 20
+
+# Governance: HITL gates and auto-approval rules
+governance:
+  # Default mode for all gates: cli | auto | slack | webhook | queue
+  default_mode: cli
+
+  hitl_gates:
+    - stage: requirements
+      mode: cli
+      # Maximum number of open_questions before auto-reject (auto mode only)
+      max_open_questions: 0
+
+    - stage: architecture
+      mode: cli
+
+    - stage: quality_gate
+      mode: auto                  # auto-evaluate based on coverage
+      coverage_threshold: 80      # minimum coverage % to auto-approve
+
+    - stage: delivery
+      mode: cli
+
+  # Optional: Slack configuration (used when mode: slack)
+  slack:
+    channel: "#sdlc-approvals"
+    # Set SLACK_BOT_TOKEN env var (never put tokens here)
+
+  # Optional: Webhook URL (used when mode: webhook)
+  # Set HITL_WEBHOOK_URL env var
+
+# Parallel developer dispatch settings
+parallel:
+  # Maximum concurrent developer agents
+  max_concurrent_developers: 4
+  # Seconds a single developer agent may run before being marked blocked
+  developer_timeout_seconds: 600
+  # Auto-approve dangerous shell commands in subagent threads (YOLO mode)
+  # Keep false for safety; enable for trusted/sandboxed environments
+  subagent_auto_approve: false
+
+# Context compression settings
+compression:
+  # Trigger when token usage exceeds this fraction of model context
+  trigger_threshold: 0.80
+  # Fraction of compressed content to allocate for summary
+  summary_ratio: 0.20
+  # Minimum summary tokens
+  min_summary_tokens: 2000
+  # Absolute ceiling for summary tokens
+  summary_tokens_ceiling: 12000
+  # Model used for summarisation (cheap + fast)
+  auxiliary_model: claude-haiku-4-5
+
+# Observability
+observability:
+  # Structured JSON log to this file (stdout if not set)
+  log_file: ~/.sdlc-factory/pipeline.log
+  log_level: INFO
+  # OpenTelemetry endpoint (optional)
+  # otel_endpoint: http://localhost:4317

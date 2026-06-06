@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SDLC Factory</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+          colors: {
+            brand: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',300:'#93c5fd',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a8a',950:'#172554' },
+          },
+          boxShadow: { card: '0 1px 3px 0 rgba(0,0,0,0.4),0 1px 2px -1px rgba(0,0,0,0.4)' },
+        }
+      }
+    }
+  </script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body, #root { height: 100%; margin: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #080e1a; color: #cbd5e1; -webkit-font-smoothing: antialiased; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    .hljs { background: #0d1117 !important; font-family: 'JetBrains Mono', monospace !important; font-size: 12px !important; line-height: 1.6 !important; border-radius: 8px; padding: 1rem !important; }
+
+    @keyframes pulse-ring { 0%{transform:scale(.8);opacity:1} 100%{transform:scale(2);opacity:0} }
+    @keyframes fade-in { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes slide-in { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:translateX(0)} }
+    @keyframes shimmer { 0%{background-position:200% center} 100%{background-position:-200% center} }
+
+    .anim-fade-in  { animation: fade-in  .2s ease forwards; }
+    .anim-slide-in { animation: slide-in .18s ease forwards; }
+
+    .skeleton {
+      background: linear-gradient(90deg, #1e293b 25%, #263347 50%, #1e293b 75%);
+      background-size: 200% auto;
+      animation: shimmer 1.5s linear infinite;
+      border-radius: 6px;
+    }
+    .pulse-dot::after {
+      content:''; position:absolute; inset:0; border-radius:50%;
+      background:currentColor; animation: pulse-ring 1.4s ease-out infinite;
+    }
+
+    .sidebar-link { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:8px; font-size:14px; font-weight:500; color:#94a3b8; transition:all .15s; cursor:pointer; }
+    .sidebar-link:hover { background:#1e293b; color:#e2e8f0; }
+    .sidebar-link.active { background:#1e3a8a22; color:#60a5fa; }
+
+    .stat-card { background: linear-gradient(135deg, #0f172a 0%, #131f35 100%); border:1px solid #1e293b; border-radius:12px; padding:20px 24px; }
+
+    .run-row { transition: background .12s; cursor:pointer; }
+    .run-row:hover td { background: #0f1a2e; }
+
+    .stage-step { transition: all .2s; }
+    .stage-step.active .step-icon { box-shadow: 0 0 0 4px rgba(59,130,246,0.2); }
+
+    .tab-btn { padding:8px 16px; font-size:13px; font-weight:500; color:#64748b; border-bottom:2px solid transparent; transition:all .15s; white-space:nowrap; cursor:pointer; }
+    .tab-btn:hover { color:#94a3b8; }
+    .tab-btn.active { color:#60a5fa; border-bottom-color:#3b82f6; }
+
+    .badge { display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:600; letter-spacing:.02em; text-transform:uppercase; }
+
+    .approve-btn { background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 0 20px rgba(5,150,105,.25); }
+    .approve-btn:hover { background: linear-gradient(135deg, #10b981, #059669); }
+    .reject-btn  { background: linear-gradient(135deg, #dc2626, #b91c1c); box-shadow: 0 0 20px rgba(220,38,38,.25); }
+    .reject-btn:hover  { background: linear-gradient(135deg, #ef4444, #dc2626); }
+    .amend-btn   { background: linear-gradient(135deg, #d97706, #b45309); box-shadow: 0 0 20px rgba(217,119,6,.25); }
+    .amend-btn:hover   { background: linear-gradient(135deg, #f59e0b, #d97706); }
+
+    .toast { position:fixed; bottom:24px; right:24px; z-index:999; padding:12px 20px; border-radius:10px; font-size:13px; font-weight:500; box-shadow:0 8px 24px rgba(0,0,0,.5); animation:fade-in .2s ease; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef, useMemo } = React;
+
+// ─── API ──────────────────────────────────────────────────────────────────────
+const api = {
+  runs:     (limit=100) => fetch(`/api/runs?limit=${limit}`).then(r=>r.json()),
+  run:      id => fetch(`/api/runs/${id}`).then(r=>r.json()),
+  stages:   id => fetch(`/api/runs/${id}/stages`).then(r=>r.json()),
+  artifact: (id,s) => fetch(`/api/runs/${id}/artifacts/${s}`).then(r=>r.json()),
+  kanban:   id => fetch(`/api/runs/${id}/kanban`).then(r=>r.json()),
+  audit:    id => fetch(`/api/runs/${id}/audit`).then(r=>r.json()),
+  cost:     id => fetch(`/api/runs/${id}/cost`).then(r=>r.json()),
+  approve:  (id,body) => fetch(`/api/runs/${id}/approve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json()),
+};
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const STATUS = {
+  running:    { color:'#3b82f6', bg:'rgba(59,130,246,.12)', label:'Running',    dot:true  },
+  completed:  { color:'#10b981', bg:'rgba(16,185,129,.12)', label:'Completed',  dot:false },
+  approved:   { color:'#10b981', bg:'rgba(16,185,129,.12)', label:'Approved',   dot:false },
+  failed:     { color:'#ef4444', bg:'rgba(239,68,68,.12)',  label:'Failed',     dot:false },
+  paused:     { color:'#f59e0b', bg:'rgba(245,158,11,.12)', label:'Paused',     dot:false },
+  pending:    { color:'#64748b', bg:'rgba(100,116,139,.10)','label':'Pending',  dot:false },
+  blocked:    { color:'#f97316', bg:'rgba(249,115,22,.12)', label:'Blocked',    dot:false },
+  in_progress:{ color:'#3b82f6', bg:'rgba(59,130,246,.12)', label:'In Progress',dot:true  },
+  done:       { color:'#10b981', bg:'rgba(16,185,129,.12)', label:'Done',       dot:false },
+};
+
+const STAGE_META = {
+  discovery:   { icon:'🔍', label:'Discovery'   },
+  requirements:{ icon:'📋', label:'Requirements'},
+  architecture:{ icon:'🏗',  label:'Architecture'},
+  planning:    { icon:'📅', label:'Planning'    },
+  development: { icon:'💻', label:'Development' },
+  quality_gate:{ icon:'🧪', label:'QA Gate'     },
+  delivery:    { icon:'🚀', label:'Delivery'    },
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const fmtTime = iso => {
+  if(!iso) return '—';
+  return new Date(iso).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+};
+const fmtDur = (a,b) => {
+  if(!a) return '—';
+  const s = Math.floor((new Date(b||new Date()) - new Date(a))/1000);
+  if(s<60) return `${s}s`;
+  if(s<3600) return `${Math.floor(s/60)}m ${s%60}s`;
+  return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
+};
+const fmtNum = n => (n||0).toLocaleString();
+
+// ─── Atoms ────────────────────────────────────────────────────────────────────
+const Badge = ({ status }) => {
+  const s = STATUS[status] || STATUS.pending;
+  return (
+    <span className="badge" style={{color:s.color, background:s.bg}}>
+      {s.dot && <span style={{width:6,height:6,borderRadius:'50%',background:s.color,display:'inline-block',position:'relative'}} className="pulse-dot" />}
+      {s.label || status}
+    </span>
+  );
+};
+
+const Skeleton = ({ h='16px', w='100%', mb='0' }) => (
+  <div className="skeleton" style={{height:h, width:w, marginBottom:mb}} />
+);
+
+const Toast = ({ msg, type='success', onDone }) => {
+  useEffect(() => { const t = setTimeout(onDone, 3000); return ()=>clearTimeout(t); }, []);
+  const bg = type==='success'?'#065f46':type==='error'?'#7f1d1d':'#78350f';
+  const border = type==='success'?'#059669':type==='error'?'#dc2626':'#d97706';
+  return (
+    <div className="toast" style={{background:bg, border:`1px solid ${border}`, color:'#fff'}}>
+      {type==='success'?'✓ ':type==='error'?'✕ ':'⚠ '}{msg}
+    </div>
+  );
+};
+
+const EmptyState = ({ icon, title, sub, code }) => (
+  <div className="flex flex-col items-center justify-center py-24 gap-4">
+    <span style={{fontSize:48}}>{icon}</span>
+    <div className="text-center">
+      <p className="text-slate-300 font-semibold text-lg">{title}</p>
+      {sub && <p className="text-slate-500 text-sm mt-1">{sub}</p>}
+    </div>
+    {code && <code style={{background:'#0f172a',border:'1px solid #1e293b',borderRadius:8,padding:'8px 16px',fontSize:12,color:'#94a3b8'}}>{code}</code>}
+  </div>
+);
+
+// ─── Stat Cards ───────────────────────────────────────────────────────────────
+const StatCards = ({ runs }) => {
+  const stats = useMemo(() => {
+    const total     = runs.length;
+    const running   = runs.filter(r=>r.status==='running').length;
+    const completed = runs.filter(r=>r.status==='completed').length;
+    const failed    = runs.filter(r=>r.status==='failed').length;
+    const paused    = runs.filter(r=>r.status==='paused').length;
+    return [
+      { label:'Total Runs',  value:total,     color:'#60a5fa', icon:'▦' },
+      { label:'Running',     value:running,   color:'#3b82f6', icon:'◎', pulse:running>0 },
+      { label:'Completed',   value:completed, color:'#10b981', icon:'✓' },
+      { label:'Failed',      value:failed,    color:'#ef4444', icon:'✕' },
+      { label:'Paused / Awaiting Approval', value:paused, color:'#f59e0b', icon:'⏸' },
+    ];
+  }, [runs]);
+
+  return (
+    <div style={{display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:16, marginBottom:28}}>
+      {stats.map(s=>(
+        <div key={s.label} className="stat-card">
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+            <span style={{fontSize:11,fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',color:'#64748b'}}>{s.label}</span>
+            <span style={{fontSize:18,color:s.color,position:'relative'}} className={s.pulse?'pulse-dot':''}>{s.icon}</span>
+          </div>
+          <span style={{fontSize:32,fontWeight:700,color:'#f1f5f9',lineHeight:1}}>{s.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ─── Run Table ────────────────────────────────────────────────────────────────
+const RunTable = ({ runs, onSelect, loading }) => {
+  if(loading) return (
+    <div style={{background:'#0b1120',border:'1px solid #1e293b',borderRadius:12,overflow:'hidden'}}>
+      {[...Array(5)].map((_,i)=>(
+        <div key={i} style={{padding:'16px 24px',borderBottom:'1px solid #0f172a',display:'flex',gap:16,alignItems:'center'}}>
+          <Skeleton h="14px" w="120px" /> <Skeleton h="14px" w="240px" /> <Skeleton h="22px" w="70px" /> <Skeleton h="14px" w="90px" />
+        </div>
+      ))}
+    </div>
+  );
+
+  if(!runs.length) return (
+    <EmptyState icon="🏭" title="No pipeline runs yet"
+      sub="Start your first run from the terminal"
+      code='python sdlc.py run "Build a FastAPI app with user auth"' />
+  );
+
+  return (
+    <div style={{background:'#0b1120',border:'1px solid #1e293b',borderRadius:12,overflow:'hidden'}}>
+      <table style={{width:'100%',borderCollapse:'collapse'}}>
+        <thead>
+          <tr style={{borderBottom:'1px solid #1e293b'}}>
+            {['Run ID','Idea','Status','Stage','Started','Duration'].map(h=>(
+              <th key={h} style={{padding:'12px 20px',textAlign:'left',fontSize:11,fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',color:'#475569',whiteSpace:'nowrap'}}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {runs.map((r,i)=>(
+            <tr key={r.run_id} className="run-row" onClick={()=>onSelect(r.run_id)}
+              style={{borderBottom:i<runs.length-1?'1px solid #0f172a':'none'}}>
+              <td style={{padding:'14px 20px',fontSize:12,fontFamily:'JetBrains Mono,monospace',color:'#60a5fa',whiteSpace:'nowrap'}}>{r.run_id}</td>
+              <td style={{padding:'14px 20px',maxWidth:320}}>
+                <p style={{fontSize:14,fontWeight:500,color:'#e2e8f0',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.idea}</p>
+              </td>
+              <td style={{padding:'14px 20px',whiteSpace:'nowrap'}}><Badge status={r.status}/></td>
+              <td style={{padding:'14px 20px',fontSize:12,color:'#64748b',whiteSpace:'nowrap'}}>{r.current_stage||'—'}</td>
+              <td style={{padding:'14px 20px',fontSize:12,color:'#64748b',whiteSpace:'nowrap'}}>{fmtTime(r.started_at)}</td>
+              <td style={{padding:'14px 20px',fontSize:12,color:'#64748b',whiteSpace:'nowrap'}}>{fmtDur(r.started_at,r.completed_at)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+// ─── Stage Pipeline ───────────────────────────────────────────────────────────
+const StagePipeline = ({ stages, selected, onSelect }) => (
+  <div style={{display:'flex',alignItems:'flex-start',gap:0,overflowX:'auto',paddingBottom:8}}>
+    {(stages||[]).map((stage,i)=>{
+      const s = STATUS[stage.status]||STATUS.pending;
+      const meta = STAGE_META[stage.name]||{icon:'⚙',label:stage.name};
+      const isActive = selected?.name===stage.name;
+      const isDone   = stage.status==='approved'||stage.status==='completed';
+      const isRun    = stage.status==='running';
+      return (
+        <React.Fragment key={stage.name}>
+          {i>0 && (
+            <div style={{
+              height:2, width:32, flexShrink:0, marginTop:20,
+              background: isDone||isRun ? 'linear-gradient(90deg,#3b82f6,#1d4ed8)' : '#1e293b',
+              transition:'background .3s',
+            }}/>
+          )}
+          <button onClick={()=>onSelect(stage)} className="stage-step" style={{
+            display:'flex',flexDirection:'column',alignItems:'center',gap:8,
+            padding:'10px 14px',borderRadius:12,border:`1px solid ${isActive?s.color+'66':'transparent'}`,
+            background: isActive ? `${s.color}11` : 'transparent',
+            cursor:'pointer',transition:'all .2s',minWidth:90,
+          }}>
+            <div className={`step-icon${isActive?' active':''}`} style={{
+              width:40,height:40,borderRadius:'50%',
+              background: isDone?'#064e3b':isRun?'#1e3a8a':isActive?'#1e293b':'#0f172a',
+              border:`2px solid ${isDone?'#10b981':isRun?'#3b82f6':'#1e293b'}`,
+              display:'flex',alignItems:'center',justifyContent:'center',
+              fontSize:18,position:'relative',transition:'all .2s',
+              boxShadow: isRun ? `0 0 12px rgba(59,130,246,.4)` : 'none',
+            }}>
+              {meta.icon}
+              {isRun && <span style={{position:'absolute',inset:-4,borderRadius:'50%',border:'2px solid rgba(59,130,246,.3)',animation:'pulse-ring 1.4s ease-out infinite'}}/>}
+            </div>
+            <div style={{textAlign:'center'}}>
+              <p style={{fontSize:11,fontWeight:600,color:isActive?s.color:'#94a3b8',whiteSpace:'nowrap',letterSpacing:'.01em'}}>{meta.label}</p>
+              <Badge status={stage.status}/>
+            </div>
+            {stage.hitl_gate && (
+              <span style={{fontSize:10,color:'#f59e0b',fontWeight:600,letterSpacing:'.04em'}}>⏸ GATE</span>
+            )}
+          </button>
+        </React.Fragment>
+      );
+    })}
+  </div>
+);
+
+// ─── JSON Viewer ──────────────────────────────────────────────────────────────
+const JsonViewer = ({ data }) => {
+  const ref = useRef(null);
+  const json = useMemo(()=>JSON.stringify(data,null,2),[data]);
+  useEffect(()=>{
+    if(ref.current){ ref.current.textContent=json; hljs.highlightElement(ref.current); }
+  },[json]);
+  return (
+    <div style={{border:'1px solid #1e293b',borderRadius:10,overflow:'hidden',maxHeight:480,overflowY:'auto'}}>
+      <pre style={{margin:0}}><code ref={ref} className="language-json" /></pre>
+    </div>
+  );
+};
+
+// ─── Artifact Tab ─────────────────────────────────────────────────────────────
+const ArtifactTab = ({ runId, stage }) => {
+  const [data,setData]=useState(null); const [loading,setLoading]=useState(true);
+  useEffect(()=>{
+    setLoading(true); setData(null);
+    api.artifact(runId,stage.name).then(setData).catch(()=>setData(null)).finally(()=>setLoading(false));
+  },[runId,stage.name]);
+
+  if(loading) return <div style={{display:'flex',flexDirection:'column',gap:8}}>{[...Array(6)].map((_,i)=><Skeleton key={i} h="16px" w={`${70+Math.random()*30}%`}/>)}</div>;
+  if(!data) return <EmptyState icon="📭" title="No artifact yet" sub="This stage hasn't produced output yet." />;
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
+        <button onClick={()=>navigator.clipboard.writeText(JSON.stringify(data,null,2))}
+          style={{fontSize:12,color:'#64748b',background:'#1e293b',border:'1px solid #334155',borderRadius:6,padding:'4px 12px',cursor:'pointer'}}>
+          Copy JSON
+        </button>
+      </div>
+      <JsonViewer data={data}/>
+    </div>
+  );
+};
+
+// ─── Kanban Tab ───────────────────────────────────────────────────────────────
+const KanbanTab = ({ runId }) => {
+  const [tasks,setTasks]=useState([]); const [loading,setLoading]=useState(true);
+  useEffect(()=>{ api.kanban(runId).then(setTasks).catch(()=>setTasks([])).finally(()=>setLoading(false)); },[runId]);
+  if(loading) return <Skeleton h="120px" />;
+  if(!tasks.length) return <EmptyState icon="📋" title="No tasks yet" sub="Kanban tasks appear when the development stage starts." />;
+
+  const cols = ['pending','in_progress','blocked','done'];
+  const colLabels = { pending:'Pending', in_progress:'In Progress', blocked:'Blocked', done:'Done' };
+  const grouped = tasks.reduce((a,t)=>{ (a[t.status]=a[t.status]||[]).push(t); return a; },{});
+
+  return (
+    <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14}}>
+      {cols.map(col=>{
+        const s = STATUS[col]||STATUS.pending;
+        return (
+          <div key={col} style={{background:'#0b1120',border:'1px solid #1e293b',borderRadius:10,overflow:'hidden'}}>
+            <div style={{padding:'10px 14px',borderBottom:'1px solid #1e293b',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <span style={{fontSize:11,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:s.color}}>{colLabels[col]}</span>
+              <span style={{fontSize:11,background:s.bg,color:s.color,borderRadius:9999,padding:'1px 7px',fontWeight:700}}>{(grouped[col]||[]).length}</span>
+            </div>
+            <div style={{padding:10,display:'flex',flexDirection:'column',gap:8,minHeight:80}}>
+              {(grouped[col]||[]).map(t=>(
+                <div key={t.task_id} style={{background:'#0f172a',border:'1px solid #1e293b',borderRadius:8,padding:'10px 12px'}}>
+                  <p style={{fontSize:12,fontWeight:500,color:'#cbd5e1',marginBottom:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.title}</p>
+                  <p style={{fontSize:11,color:'#475569'}}>{t.assignee}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ─── Audit Tab ────────────────────────────────────────────────────────────────
+const AuditTab = ({ runId }) => {
+  const [log,setLog]=useState([]); const [loading,setLoading]=useState(true);
+  useEffect(()=>{ api.audit(runId).then(setLog).catch(()=>setLog([])).finally(()=>setLoading(false)); },[runId]);
+  if(loading) return <Skeleton h="80px"/>;
+  if(!log.length) return <EmptyState icon="📜" title="No audit entries" sub="Decisions appear here after HITL gates." />;
+
+  const decisionStyle = { APPROVED:{color:'#10b981',bg:'rgba(16,185,129,.1)'}, REJECTED:{color:'#ef4444',bg:'rgba(239,68,68,.1)'}, AMENDED:{color:'#f59e0b',bg:'rgba(245,158,11,.1)'} };
+
+  return (
+    <div style={{position:'relative',paddingLeft:24}}>
+      <div style={{position:'absolute',left:7,top:8,bottom:8,width:2,background:'#1e293b',borderRadius:2}}/>
+      <div style={{display:'flex',flexDirection:'column',gap:12}}>
+        {log.map((e,i)=>{
+          const ds = decisionStyle[e.decision]||{color:'#64748b',bg:'rgba(100,116,139,.1)'};
+          return (
+            <div key={i} className="anim-fade-in" style={{position:'relative',paddingLeft:20}}>
+              <div style={{position:'absolute',left:-7,top:14,width:14,height:14,borderRadius:'50%',background:ds.color,border:'2px solid #080e1a',boxShadow:`0 0 8px ${ds.color}66`}}/>
+              <div style={{background:'#0b1120',border:'1px solid #1e293b',borderRadius:10,padding:'12px 16px'}}>
+                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6,flexWrap:'wrap'}}>
+                  <span style={{fontSize:12,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:ds.color,background:ds.bg,padding:'2px 8px',borderRadius:4}}>{e.decision}</span>
+                  <span style={{fontSize:13,fontWeight:600,color:'#94a3b8'}}>{e.stage}</span>
+                  <span style={{fontSize:11,color:'#475569',marginLeft:'auto'}}>{fmtTime(e.timestamp)}</span>
+                </div>
+                <p style={{fontSize:12,color:'#64748b'}}>by <span style={{color:'#94a3b8'}}>{e.actor}</span>{e.rationale&&` — ${e.rationale}`}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ─── Cost Tab ─────────────────────────────────────────────────────────────────
+const CostTab = ({ runId }) => {
+  const [data,setData]=useState(null); const [loading,setLoading]=useState(true);
+  useEffect(()=>{ api.cost(runId).then(setData).catch(()=>setData(null)).finally(()=>setLoading(false)); },[runId]);
+  if(loading) return <Skeleton h="120px"/>;
+  if(!data||!data.items?.length) return <EmptyState icon="💰" title="No cost data" sub="Token usage is recorded when the pipeline runs with a live API key." />;
+
+  const maxCost = Math.max(...data.items.map(r=>r.cost_usd||0));
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:20}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14}}>
+        {[
+          { label:'Tokens In',  value:fmtNum(data.total_tokens_in),  color:'#60a5fa' },
+          { label:'Tokens Out', value:fmtNum(data.total_tokens_out), color:'#a78bfa' },
+          { label:'Total Cost', value:`$${(data.total_cost_usd||0).toFixed(4)}`, color:'#34d399' },
+        ].map(({label,value,color})=>(
+          <div key={label} style={{background:'#0b1120',border:'1px solid #1e293b',borderRadius:10,padding:'16px 20px',textAlign:'center'}}>
+            <p style={{fontSize:26,fontWeight:700,color,fontFamily:'JetBrains Mono,monospace'}}>{value}</p>
+            <p style={{fontSize:11,color:'#64748b',marginTop:4,fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase'}}>{label}</p>
+          </div>
+        ))}
+      </div>
+
+      <div style={{background:'#0b1120',border:'1px solid #1e293b',borderRadius:10,overflow:'hidden'}}>
+        <div style={{padding:'12px 20px',borderBottom:'1px solid #1e293b',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <span style={{fontSize:12,fontWeight:600,color:'#64748b',letterSpacing:'.06em',textTransform:'uppercase'}}>Breakdown by stage / role</span>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:0}}>
+          {data.items.map((r,i)=>(
+            <div key={i} style={{padding:'12px 20px',borderBottom:i<data.items.length-1?'1px solid #0f172a':'none',display:'grid',gridTemplateColumns:'1fr 1fr 1fr auto',gap:12,alignItems:'center'}}>
+              <div>
+                <p style={{fontSize:12,fontWeight:600,color:'#e2e8f0'}}>{r.stage}</p>
+                <p style={{fontSize:11,color:'#64748b'}}>{r.role}</p>
+              </div>
+              <p style={{fontSize:11,color:'#64748b',fontFamily:'JetBrains Mono,monospace'}}>{r.model||'—'}</p>
+              <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                <div style={{height:4,borderRadius:4,background:'#1e293b',overflow:'hidden'}}>
+                  <div style={{height:'100%',borderRadius:4,background:'linear-gradient(90deg,#3b82f6,#6366f1)',width:`${maxCost>0?(r.cost_usd/maxCost*100):0}%`,transition:'width .4s'}}/>
+                </div>
+                <p style={{fontSize:10,color:'#475569'}}>{fmtNum(r.tokens_in)} in / {fmtNum(r.tokens_out)} out</p>
+              </div>
+              <p style={{fontSize:13,fontWeight:700,color:'#34d399',fontFamily:'JetBrains Mono,monospace',textAlign:'right'}}>${(r.cost_usd||0).toFixed(4)}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Approval Modal ───────────────────────────────────────────────────────────
+const ApprovalModal = ({ runId, stage, artifact, onClose, onDone }) => {
+  const [decision,setDecision]=useState('APPROVED');
+  const [rationale,setRationale]=useState('');
+  const [amendedJson,setAmendedJson]=useState(JSON.stringify(artifact,null,2));
+  const [loading,setLoading]=useState(false);
+  const [error,setError]=useState('');
+
+  const submit = async () => {
+    setLoading(true); setError('');
+    try {
+      const body = {stage:stage.name, decision, rationale};
+      if(decision==='AMENDED'){
+        try { body.amended_artifact=JSON.parse(amendedJson); } catch { setError('Invalid JSON in amended artifact'); setLoading(false); return; }
+      }
+      await api.approve(runId, body);
+      onDone(decision);
+    } catch(e){ setError(e.message); } finally { setLoading(false); }
+  };
+
+  const btnStyle = decision==='APPROVED'?'approve-btn':decision==='REJECTED'?'reject-btn':'amend-btn';
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.75)',backdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:24}}>
+      <div style={{background:'#0b1120',border:'1px solid #1e293b',borderRadius:16,width:'100%',maxWidth:680,maxHeight:'90vh',display:'flex',flexDirection:'column',boxShadow:'0 25px 60px rgba(0,0,0,.8)'}} className="anim-fade-in">
+
+        {/* Header */}
+        <div style={{padding:'20px 24px',borderBottom:'1px solid #1e293b',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div>
+            <p style={{fontSize:11,color:'#64748b',fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:4}}>HITL Gate Review</p>
+            <h2 style={{fontSize:18,fontWeight:700,color:'#f1f5f9'}}>{STAGE_META[stage.name]?.icon} {STAGE_META[stage.name]?.label||stage.name}</h2>
+          </div>
+          <button onClick={onClose} style={{width:32,height:32,borderRadius:8,background:'#1e293b',border:'none',color:'#64748b',fontSize:18,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
+        </div>
+
+        <div style={{flex:1,overflowY:'auto',padding:24,display:'flex',flexDirection:'column',gap:20}}>
+          {/* Decision */}
+          <div>
+            <label style={{fontSize:11,fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',color:'#64748b',display:'block',marginBottom:10}}>Decision</label>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
+              {[['APPROVED','✓ Approve','approve-btn'],['REJECTED','✕ Reject','reject-btn'],['AMENDED','✎ Amend','amend-btn']].map(([d,label,cls])=>(
+                <button key={d} onClick={()=>setDecision(d)} className={decision===d?cls:''} style={{
+                  padding:'10px',borderRadius:10,fontWeight:600,fontSize:13,cursor:'pointer',transition:'all .15s',
+                  background:decision===d?undefined:'#0f172a',
+                  border:`1px solid ${decision===d?'transparent':'#1e293b'}`,
+                  color:decision===d?'#fff':'#64748b',
+                }}>{label}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Rationale */}
+          <div>
+            <label style={{fontSize:11,fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',color:'#64748b',display:'block',marginBottom:8}}>Rationale</label>
+            <textarea value={rationale} onChange={e=>setRationale(e.target.value)} rows={2} placeholder="Explain your decision (optional)"
+              style={{width:'100%',background:'#0f172a',border:'1px solid #1e293b',borderRadius:8,padding:'10px 14px',fontSize:13,color:'#e2e8f0',resize:'vertical',fontFamily:'inherit',outline:'none'}}
+              onFocus={e=>e.target.style.borderColor='#3b82f6'} onBlur={e=>e.target.style.borderColor='#1e293b'}
+            />
+          </div>
+
+          {/* Amended artifact */}
+          {decision==='AMENDED' && (
+            <div>
+              <label style={{fontSize:11,fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',color:'#f59e0b',display:'block',marginBottom:8}}>Amended Artifact (JSON)</label>
+              <textarea value={amendedJson} onChange={e=>setAmendedJson(e.target.value)} rows={10}
+                style={{width:'100%',background:'#0d1117',border:'1px solid #2d3f5e',borderRadius:8,padding:'12px',fontSize:12,color:'#e2e8f0',fontFamily:'JetBrains Mono,monospace',resize:'vertical',outline:'none'}}
+                onFocus={e=>e.target.style.borderColor='#f59e0b'} onBlur={e=>e.target.style.borderColor='#2d3f5e'}
+              />
+            </div>
+          )}
+
+          {/* Current artifact */}
+          <div>
+            <label style={{fontSize:11,fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',color:'#64748b',display:'block',marginBottom:8}}>Current Artifact</label>
+            <JsonViewer data={artifact}/>
+          </div>
+
+          {error && <p style={{fontSize:13,color:'#ef4444',background:'rgba(239,68,68,.1)',border:'1px solid rgba(239,68,68,.2)',borderRadius:8,padding:'10px 14px'}}>{error}</p>}
+        </div>
+
+        <div style={{padding:'16px 24px',borderTop:'1px solid #1e293b',display:'flex',justifyContent:'flex-end',gap:10}}>
+          <button onClick={onClose} style={{padding:'9px 20px',borderRadius:8,background:'transparent',border:'1px solid #1e293b',color:'#64748b',fontSize:13,fontWeight:500,cursor:'pointer'}}>Cancel</button>
+          <button onClick={submit} disabled={loading} className={btnStyle}
+            style={{padding:'9px 24px',borderRadius:8,color:'#fff',fontSize:13,fontWeight:600,cursor:'pointer',opacity:loading?.6:1,border:'none'}}>
+            {loading?'Submitting…':`Submit ${decision}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Run Detail ───────────────────────────────────────────────────────────────
+const RunDetail = ({ runId, onBack }) => {
+  const [run,setRun]=useState(null); const [loading,setLoading]=useState(true);
+  const [selected,setSelected]=useState(null);
+  const [tab,setTab]=useState('artifact');
+  const [approvalData,setApprovalData]=useState(null);
+  const [toast,setToast]=useState(null);
+  const iv=useRef(null);
+
+  const refresh=useCallback(()=>{
+    api.run(runId).then(d=>{ setRun(d); setLoading(false);
+      if(!selected && d.stages?.length) setSelected(s=>s||d.stages.find(x=>x.status==='running')||d.stages.find(x=>x.status==='approved')||d.stages[0]);
+    }).catch(()=>setLoading(false));
+  },[runId]);
+
+  useEffect(()=>{ refresh(); iv.current=setInterval(refresh,5000); return()=>clearInterval(iv.current); },[refresh]);
+
+  const openApproval=async(stage)=>{
+    const artifact=await api.artifact(runId,stage.name);
+    setApprovalData({stage,artifact});
+  };
+
+  if(loading) return <div style={{padding:32}}><Skeleton h="28px" w="300px" mb="16px"/><Skeleton h="120px"/></div>;
+  if(!run) return <EmptyState icon="🔍" title="Run not found" />;
+
+  const tabs=[['artifact','Artifact'],['kanban','Kanban'],['audit','Audit Log'],['cost','Cost']];
+  const canApprove = run.status==='paused' && selected?.hitl_gate && (selected?.status==='pending'||!selected?.approved_at);
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:24}} className="anim-fade-in">
+
+      {/* Breadcrumb + header */}
+      <div>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:16}}>
+          <button onClick={onBack} style={{background:'none',border:'none',color:'#3b82f6',cursor:'pointer',fontSize:13,padding:0,display:'flex',alignItems:'center',gap:4}}>← Runs</button>
+          <span style={{color:'#334155'}}>/</span>
+          <span style={{fontSize:13,color:'#64748b',fontFamily:'JetBrains Mono,monospace'}}>{runId}</span>
+        </div>
+        <div style={{background:'#0b1120',border:'1px solid #1e293b',borderRadius:14,padding:'20px 24px',display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
+          <div style={{flex:1,minWidth:0}}>
+            <h1 style={{fontSize:22,fontWeight:700,color:'#f1f5f9',marginBottom:8,wordBreak:'break-word'}}>{run.idea}</h1>
+            <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
+              <Badge status={run.status}/>
+              <span style={{fontSize:12,color:'#475569',fontFamily:'JetBrains Mono,monospace'}}>{runId}</span>
+              <span style={{fontSize:12,color:'#475569'}}>Started {fmtTime(run.started_at)}</span>
+              <span style={{fontSize:12,color:'#475569'}}>Duration {fmtDur(run.started_at,run.completed_at)}</span>
+            </div>
+          </div>
+          {run.status==='paused' && (
+            <div style={{background:'rgba(245,158,11,.08)',border:'1px solid rgba(245,158,11,.2)',borderRadius:10,padding:'10px 16px',display:'flex',alignItems:'center',gap:10}}>
+              <span style={{fontSize:20}}>⏸</span>
+              <div>
+                <p style={{fontSize:12,fontWeight:700,color:'#f59e0b'}}>Awaiting Approval</p>
+                <p style={{fontSize:11,color:'#92400e'}}>Stage: {run.current_stage}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Pipeline */}
+      <div style={{background:'#0b1120',border:'1px solid #1e293b',borderRadius:14,padding:'20px 24px'}}>
+        <p style={{fontSize:11,fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',color:'#475569',marginBottom:16}}>Pipeline Progress</p>
+        <StagePipeline stages={run.stages||[]} selected={selected} onSelect={s=>{setSelected(s);setTab('artifact');}}/>
+      </div>
+
+      {/* Stage detail */}
+      {selected && (
+        <div style={{background:'#0b1120',border:'1px solid #1e293b',borderRadius:14,overflow:'hidden'}} className="anim-slide-in">
+          {/* Stage header */}
+          <div style={{padding:'16px 24px',borderBottom:'1px solid #1e293b',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
+            <div style={{display:'flex',alignItems:'center',gap:12}}>
+              <span style={{fontSize:24}}>{STAGE_META[selected.name]?.icon||'⚙'}</span>
+              <div>
+                <h2 style={{fontSize:16,fontWeight:700,color:'#f1f5f9'}}>{STAGE_META[selected.name]?.label||selected.name}</h2>
+                <div style={{display:'flex',gap:8,alignItems:'center',marginTop:4}}>
+                  <Badge status={selected.status}/>
+                  {selected.parallel&&<span style={{fontSize:10,color:'#475569',fontWeight:600,letterSpacing:'.04em',textTransform:'uppercase'}}>Parallel</span>}
+                  {selected.approved_by&&<span style={{fontSize:11,color:'#475569'}}>Approved by {selected.approved_by} · {fmtTime(selected.approved_at)}</span>}
+                </div>
+              </div>
+            </div>
+            {canApprove && (
+              <button onClick={()=>openApproval(selected)} style={{
+                padding:'9px 20px',borderRadius:10,background:'linear-gradient(135deg,#d97706,#b45309)',
+                border:'none',color:'#fff',fontSize:13,fontWeight:600,cursor:'pointer',
+                boxShadow:'0 0 20px rgba(217,119,6,.3)',display:'flex',alignItems:'center',gap:8,
+              }}>⏸ Review Gate</button>
+            )}
+          </div>
+
+          {/* Tabs */}
+          <div style={{display:'flex',gap:0,borderBottom:'1px solid #1e293b',paddingLeft:24,overflowX:'auto'}}>
+            {tabs.map(([id,label])=>(
+              <button key={id} className={`tab-btn${tab===id?' active':''}`} onClick={()=>setTab(id)}>{label}</button>
+            ))}
+          </div>
+
+          <div style={{padding:24}}>
+            {tab==='artifact'&&<ArtifactTab runId={runId} stage={selected}/>}
+            {tab==='kanban'  &&<KanbanTab runId={runId}/>}
+            {tab==='audit'   &&<AuditTab runId={runId}/>}
+            {tab==='cost'    &&<CostTab runId={runId}/>}
+          </div>
+        </div>
+      )}
+
+      {/* Approval modal */}
+      {approvalData && (
+        <ApprovalModal runId={runId} stage={approvalData.stage} artifact={approvalData.artifact}
+          onClose={()=>setApprovalData(null)}
+          onDone={(d)=>{ setApprovalData(null); setToast({msg:`Stage ${d.toLowerCase()} successfully`,type:'success'}); refresh(); }}
+        />
+      )}
+      {toast && <Toast msg={toast.msg} type={toast.type} onDone={()=>setToast(null)}/>}
+    </div>
+  );
+};
+
+// ─── Run List Page ────────────────────────────────────────────────────────────
+const RunsPage = ({ onSelect }) => {
+  const [runs,setRuns]=useState([]); const [loading,setLoading]=useState(true);
+  const [filter,setFilter]=useState('all');
+  const iv=useRef(null);
+
+  const refresh=()=>{ api.runs().then(setRuns).catch(()=>{}).finally(()=>setLoading(false)); };
+  useEffect(()=>{ refresh(); iv.current=setInterval(refresh,5000); return()=>clearInterval(iv.current); },[]);
+
+  const filtered=useMemo(()=>filter==='all'?runs:runs.filter(r=>r.status===filter),[runs,filter]);
+  const filters=[['all','All'],['running','Running'],['paused','Paused'],['completed','Completed'],['failed','Failed']];
+
+  return (
+    <div className="anim-fade-in">
+      {!loading && <StatCards runs={runs}/>}
+
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:12}}>
+        <h2 style={{fontSize:16,fontWeight:700,color:'#f1f5f9'}}>Pipeline Runs</h2>
+        <div style={{display:'flex',gap:6,alignItems:'center'}}>
+          <span style={{fontSize:11,color:'#475569',marginRight:4}}>Auto-refresh every 5s</span>
+          {filters.map(([val,label])=>(
+            <button key={val} onClick={()=>setFilter(val)} style={{
+              padding:'5px 12px',borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer',border:'1px solid',transition:'all .15s',
+              background:filter===val?'#1e3a8a':'transparent',
+              borderColor:filter===val?'#3b82f6':'#1e293b',
+              color:filter===val?'#60a5fa':'#64748b',
+            }}>{label}</button>
+          ))}
+        </div>
+      </div>
+
+      <RunTable runs={filtered} onSelect={onSelect} loading={loading}/>
+    </div>
+  );
+};
+
+// ─── App Shell ────────────────────────────────────────────────────────────────
+const App = () => {
+  const [page,setPage]=useState('runs');
+  const [runId,setRunId]=useState(null);
+
+  const navTo=(r)=>{ setRunId(r); setPage('detail'); };
+  const navBack=()=>{ setRunId(null); setPage('runs'); };
+
+  return (
+    <div style={{display:'flex',height:'100vh',overflow:'hidden'}}>
+
+      {/* Sidebar */}
+      <aside style={{width:220,flexShrink:0,background:'#080e1a',borderRight:'1px solid #0f172a',display:'flex',flexDirection:'column',padding:'20px 14px'}}>
+        <div style={{marginBottom:32,paddingLeft:8}}>
+          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
+            <span style={{fontSize:24}}>🏭</span>
+            <div>
+              <p style={{fontSize:14,fontWeight:800,color:'#f1f5f9',letterSpacing:'-0.01em'}}>SDLC Factory</p>
+              <p style={{fontSize:10,color:'#334155',fontWeight:500}}>v0.1.0</p>
+            </div>
+          </div>
+        </div>
+
+        <nav style={{display:'flex',flexDirection:'column',gap:4}}>
+          <p style={{fontSize:10,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',color:'#334155',padding:'4px 12px',marginBottom:4}}>Pipeline</p>
+          <div className={`sidebar-link${page==='runs'?' active':''}`} onClick={navBack}>
+            <span>▦</span> Runs
+          </div>
+          {runId && (
+            <div className={`sidebar-link${page==='detail'?' active':''}`} onClick={()=>setPage('detail')}>
+              <span style={{fontSize:12}}>⟩</span>
+              <span style={{fontSize:12,fontFamily:'JetBrains Mono,monospace',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{runId}</span>
+            </div>
+          )}
+        </nav>
+
+        <div style={{marginTop:'auto',padding:'12px',borderTop:'1px solid #0f172a'}}>
+          <a href="/api/docs" target="_blank" style={{display:'flex',alignItems:'center',gap:8,fontSize:12,color:'#475569',textDecoration:'none',padding:'6px 8px',borderRadius:6}}>
+            <span>⎈</span> API Docs
+          </a>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <main style={{flex:1,overflowY:'auto',padding:'28px 32px',background:'#080e1a'}}>
+        {page==='runs'   && <RunsPage onSelect={navTo}/>}
+        {page==='detail' && runId && <RunDetail runId={runId} onBack={navBack}/>}
+      </main>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

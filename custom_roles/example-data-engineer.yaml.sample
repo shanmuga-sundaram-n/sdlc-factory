@@ -1,0 +1,57 @@
+# Example custom role definition — copy to <role-name>.yaml and customise.
+# Place YAML files in the custom_roles/ directory; they are loaded at pipeline startup.
+# Remove the .sample suffix to activate this role.
+
+role: data_engineer
+display_name: Data Engineer
+skill_md_path: skills/data-engineer/SKILL.md   # optional — leave blank if no SKILL.md
+authority_statement: >
+  You design and implement data pipelines, ETL jobs, and data warehouse schemas.
+  You own the data layer and ensure data quality, lineage tracking, and efficient
+  query performance. You do NOT make application architecture decisions.
+
+max_iterations: 35
+
+# Toolsets this role may access (names must match registered toolsets)
+enabled_toolsets:
+  - read_file
+  - write_file
+  - patch
+  - terminal
+  - execute_code
+
+# JSON Schema for the artifact this role must produce
+output_schema:
+  type: object
+  required:
+    - pipeline_steps
+    - schemas_created
+  properties:
+    pipeline_steps:
+      type: array
+      items:
+        type: object
+        required: [name, source, destination, transformation]
+        properties:
+          name: {type: string}
+          source: {type: string}
+          destination: {type: string}
+          transformation: {type: string}
+    schemas_created:
+      type: array
+      items: {type: string}
+    data_quality_checks:
+      type: array
+      items: {type: string}
+    files_written:
+      type: array
+      items: {type: string}
+    notes:
+      type: string
+
+# Stages whose artifacts this role should receive as context
+prior_stages:
+  - discovery
+  - requirements
+  - architecture
+  - planning
