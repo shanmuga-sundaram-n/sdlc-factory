@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from core.registry import registry
-from tools._context import get_workspace, safe_resolve
+from tools._context import agent_env, get_workspace, safe_resolve
 
 _MAX_OUTPUT_BYTES = 8_192
 
@@ -117,6 +117,7 @@ def run_pytest(
         proc = subprocess.run(
             cmd,
             cwd=str(cwd),
+            env=agent_env(),
             capture_output=True,
             text=True,
             timeout=timeout,
