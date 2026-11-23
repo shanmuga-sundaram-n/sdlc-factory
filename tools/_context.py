@@ -12,6 +12,7 @@ Thread-local storage keeps parallel developer agents safely isolated.
 
 from __future__ import annotations
 
+import os
 import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
@@ -61,3 +62,23 @@ def safe_resolve(path_str: str) -> Path:
             f"the workspace {workspace}"
         )
     return candidate
+
+
+# Variables an agent-run subprocess must not inherit: the dashboard token and the
+# provider/service secrets. Agent-written code runs through the terminal and pytest
+# tools, so anything left in the environment is readable by it.
+SECRET_ENV_VARS = (
+    "SDLC_UI_TOKEN",
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "SLACK_BOT_TOKEN",
+    "HITL_WEBHOOK_URL",
+    "BRAVE_SEARCH_API_KEY",
+    "GH_TOKEN",
+    "GITHUB_TOKEN",
+)
+
+
+def agent_env() -> dict:
+    """Environment for subprocesses that run agent-controlled code."""
+    return {k: v for k, v in os.environ.items() if k not in SECRET_ENV_VARS}

@@ -71,9 +71,9 @@ python sdlc.py run "Build a FastAPI todo app with user auth"
 # Run fully automated (auto-approve all gates)
 python sdlc.py run "Build a SaaS billing platform" --auto-approve
 
-# Launch the Web UI dashboard
+# Launch the Web UI dashboard (it prints a link with your access key; open that link)
 python sdlc.py ui
-# → http://127.0.0.1:7474
+# → http://127.0.0.1:7474/#token=<key>
 ```
 
 Generated code and artifacts land in `./output/<run_id>/`. The SQLite state DB is at `~/.sdlc-factory/pipeline.db`.
@@ -155,7 +155,7 @@ python sdlc.py list [--limit 20] [--tenant <tenant-id>]
 python sdlc.py export <run_id> [--output-dir ./output]
 
 # Launch the Web UI dashboard
-python sdlc.py ui [--host 127.0.0.1] [--port 7474] [--reload]
+python sdlc.py ui [--host 127.0.0.1] [--port 7474] [--reload] [--allow-remote]
 ```
 
 ---
@@ -167,8 +167,23 @@ The Web UI is a React single-page dashboard served by a FastAPI backend. Install
 ```bash
 uv sync --extra ui
 python sdlc.py ui
-# → http://127.0.0.1:7474
+# → http://127.0.0.1:7474/#token=<key>
 ```
+
+### Access
+
+Every API request needs a per-launch access key, so a web page you happen to have open cannot approve pipeline stages. `python sdlc.py ui` prints it once:
+
+```
+Dashboard ready. Open this link (it includes your access key):
+http://127.0.0.1:7474/#token=<key>
+Keep this terminal open. Anyone with the link can approve stages, so do not share it. Restarting makes a new link.
+```
+
+- **Open that link.** The page keeps the key for that browser tab only and removes it from the address bar. A bookmark, a second tab, or a restarted server shows the "Dashboard locked" or "Session ended" screen: open the new link from your terminal, or paste it into the field on that screen.
+- **Treat the link like a password.** Anyone who has it can approve stages. Restarting `sdlc.py ui` makes a new one.
+- **Loopback only by default.** `--host 0.0.0.0` (or any non-loopback address) is refused unless you pass `--allow-remote`. The key still gates the API, but the connection is plain HTTP.
+- **Running uvicorn directly** needs the key in the environment: `SDLC_UI_TOKEN=<key> uvicorn gateway.web_server:app`. The app refuses to start without it.
 
 **Features:**
 - **Run list** with live status badges and auto-refresh every 5 seconds

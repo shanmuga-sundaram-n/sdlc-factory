@@ -22,7 +22,7 @@ import subprocess
 from typing import Optional
 
 from core.registry import registry, tool_error
-from tools._context import get_workspace, safe_resolve
+from tools._context import agent_env, get_workspace, safe_resolve
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,7 @@ def _terminal(command: str, cwd: Optional[str] = None, timeout: int = 60) -> str
         result = subprocess.run(
             args,
             cwd=str(run_dir),
+            env=agent_env(),
             capture_output=True,
             text=True,
             timeout=timeout,

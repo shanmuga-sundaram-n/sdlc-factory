@@ -1,23 +1,45 @@
 """Web UI backend — FastAPI REST API for the SDLC Factory dashboard.
 
 Serves the React single-page app at / and exposes read/write API endpoints
-that mirror the existing CLI commands. No auth — intended for local dev use.
+that mirror the existing CLI commands. Every /api request needs the per-launch
+access token (Authorization: Bearer, see gateway/auth.py); the page itself is public.
 
 Start with:
     python sdlc.py ui [--port 7474] [--host 127.0.0.1]
-Or directly:
-    uvicorn gateway.web_server:app --port 7474
+Or directly (SDLC_UI_TOKEN must be set, or the app refuses to start; set
+SDLC_UI_ALLOW_REMOTE=1 to accept a non-loopback Host header):
+    SDLC_UI_TOKEN=<token> uvicorn gateway.web_server:app --port 7474
 """
 
 from __future__ import annotations
 
 import logging
+import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
 _UI_DIR = Path(__file__).parent.parent / "ui"
+
+_LOOPBACK_HOSTS = ("127.0.0.1", "localhost")
+
+
+def _allowed_hosts() -> List[str]:
+    """Host headers the dashboard answers to (DNS-rebinding defense).
+
+    Loopback names plus the host ``sdlc.py ui`` bound to. ``--allow-remote``
+    (SDLC_UI_ALLOW_REMOTE=1) accepts any Host; the token still gates the API.
+    """
+    if os.environ.get("SDLC_UI_ALLOW_REMOTE") == "1":
+        return ["*"]
+    hosts = list(_LOOPBACK_HOSTS)
+    bound = os.environ.get("SDLC_UI_HOST", "")
+    if bound and bound not in hosts:
+        hosts.append(bound)
+    return hosts
+
 
 # ---------------------------------------------------------------------------
 # Lazy FastAPI import — keeps startup fast when ui extra is not installed
@@ -26,26 +48,38 @@ _UI_DIR = Path(__file__).parent.parent / "ui"
 
 def _get_app():
     try:
-        from fastapi import FastAPI, HTTPException, Body
+        from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException
         from fastapi.responses import HTMLResponse
-        from fastapi.middleware.cors import CORSMiddleware
+        from fastapi.middleware.trustedhost import TrustedHostMiddleware
     except ImportError as exc:
         raise RuntimeError("Web UI requires the 'ui' extra: uv sync --extra ui") from exc
 
     from core.session import get_default_db
     from core.pipeline import SDLC_STAGES
+    from gateway.auth import TOKEN_ENV, require_token
 
     _STAGE_NAMES = [s.name for s in SDLC_STAGES]
     _STAGE_META = {s.name: {"parallel": s.parallel, "hitl_gate": s.hitl_gate} for s in SDLC_STAGES}
 
-    app = FastAPI(title="SDLC Factory", version="0.1.0", docs_url="/api/docs")
+    @asynccontextmanager
+    async def lifespan(_app):
+        # Refuse to serve an open dashboard. Checked at startup, not at import,
+        # so importing this module (tests, tooling) never needs the token.
+        if not os.environ.get(TOKEN_ENV):
+            raise RuntimeError(
+                f"{TOKEN_ENV} is not set. Start the dashboard with `python sdlc.py ui`, "
+                f"or export {TOKEN_ENV} before running uvicorn directly."
+            )
+        yield
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    app = FastAPI(title="SDLC Factory", version="0.1.0", docs_url="/api/docs", lifespan=lifespan)
+
+    # No CORS middleware: the SPA is same-origin, and a request from another
+    # origin fails its preflight. Host validation closes DNS rebinding.
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=_allowed_hosts())
+
+    # Every /api route needs the token; the SPA shell at / stays public.
+    api = APIRouter(dependencies=[Depends(require_token)])
 
     # ------------------------------------------------------------------
     # Helpers
@@ -106,11 +140,11 @@ def _get_app():
     # Run endpoints
     # ------------------------------------------------------------------
 
-    @app.get("/api/runs")
+    @api.get("/api/runs")
     def list_runs(limit: int = 50) -> List[Dict[str, Any]]:
         return _db().list_runs(limit=limit)
 
-    @app.get("/api/runs/{run_id}")
+    @api.get("/api/runs/{run_id}")
     def get_run(run_id: str) -> Dict[str, Any]:
         run = _db().get_run(run_id)
         if not run:
@@ -118,32 +152,32 @@ def _get_app():
         run["stages"] = _stage_statuses(run_id)
         return run
 
-    @app.get("/api/runs/{run_id}/stages")
+    @api.get("/api/runs/{run_id}/stages")
     def get_stages(run_id: str) -> List[Dict[str, Any]]:
         if not _db().get_run(run_id):
             raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
         return _stage_statuses(run_id)
 
-    @app.get("/api/runs/{run_id}/artifacts/{stage}")
+    @api.get("/api/runs/{run_id}/artifacts/{stage}")
     def get_artifact(run_id: str, stage: str) -> Any:
         artifact = _db().get_artifact(run_id, stage)
         if artifact is None:
             raise HTTPException(status_code=404, detail=f"No artifact for stage {stage}")
         return artifact
 
-    @app.get("/api/runs/{run_id}/kanban")
+    @api.get("/api/runs/{run_id}/kanban")
     def get_kanban(run_id: str) -> List[Dict[str, Any]]:
         if not _db().get_run(run_id):
             raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
         return _db().list_tasks(run_id)
 
-    @app.get("/api/runs/{run_id}/audit")
+    @api.get("/api/runs/{run_id}/audit")
     def get_audit(run_id: str) -> List[Dict[str, Any]]:
         if not _db().get_run(run_id):
             raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
         return _db().get_audit_log(run_id)
 
-    @app.get("/api/runs/{run_id}/cost")
+    @api.get("/api/runs/{run_id}/cost")
     def get_cost(run_id: str) -> Dict[str, Any]:
         rows = _db().get_token_summary(run_id)
         total_in = total_out = total_cost = 0.0
@@ -168,7 +202,7 @@ def _get_app():
     # HITL approval endpoint
     # ------------------------------------------------------------------
 
-    @app.post("/api/runs/{run_id}/approve")
+    @api.post("/api/runs/{run_id}/approve")
     def approve_stage(
         run_id: str,
         payload: Dict[str, Any] = Body(...),
@@ -210,6 +244,8 @@ def _get_app():
         db.approve_artifact(run_id, stage, approved_by=actor)
         db.log_decision(run_id, stage, decision.value, actor, rationale)
         return {"status": decision.value.lower()}
+
+    app.include_router(api)
 
     # ------------------------------------------------------------------
     # Serve the React SPA

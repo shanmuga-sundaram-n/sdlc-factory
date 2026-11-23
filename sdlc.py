@@ -14,9 +14,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import logging
 import os
+import secrets
 import sys
 from pathlib import Path
 
@@ -402,6 +404,15 @@ def cmd_export(args: argparse.Namespace) -> int:
     return 0
 
 
+def _is_loopback(host: str) -> bool:
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
 def cmd_ui(args: argparse.Namespace) -> int:
     try:
         import uvicorn
@@ -412,7 +423,31 @@ def cmd_ui(args: argparse.Namespace) -> int:
         )
         return 1
 
-    print(f"\nSDLC Factory UI → http://{args.host}:{args.port}\n")
+    if not _is_loopback(args.host) and not args.allow_remote:
+        print(
+            f"Refusing to serve the dashboard on {args.host}: it is not a loopback address.\n"
+            "Anyone who can reach it and learns the link could approve pipeline stages.\n"
+            "Pass --allow-remote if you really want that.",
+            file=sys.stderr,
+        )
+        return 1
+
+    # uvicorn imports the app by string (and under --reload in a child process),
+    # so the per-launch token and bind settings travel by environment variable.
+    token = secrets.token_urlsafe(32)
+    os.environ["SDLC_UI_TOKEN"] = token
+    os.environ["SDLC_UI_HOST"] = args.host
+    if args.allow_remote:
+        os.environ["SDLC_UI_ALLOW_REMOTE"] = "1"
+
+    link_host = "127.0.0.1" if args.host in ("0.0.0.0", "::") else args.host
+    print("\nDashboard ready. Open this link (it includes your access key):", flush=True)
+    print(f"http://{link_host}:{args.port}/#token={token}", flush=True)
+    print(
+        "Keep this terminal open. Anyone with the link can approve stages, so do not "
+        "share it. Restarting makes a new link.\n",
+        flush=True,
+    )
     uvicorn.run(
         "gateway.web_server:app",
         host=args.host,
@@ -546,6 +581,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_ui.add_argument("--host", default="127.0.0.1", help="Bind host (default: 127.0.0.1)")
     p_ui.add_argument("--port", type=int, default=7474, help="Port (default: 7474)")
     p_ui.add_argument("--reload", action="store_true", help="Enable auto-reload (dev mode)")
+    p_ui.add_argument(
+        "--allow-remote",
+        action="store_true",
+        help="Allow a non-loopback --host (the access token still gates the API)",
+    )
 
     # export
     p_export = sub.add_parser("export", help="Write all DB artifacts for a run to disk as JSON")
