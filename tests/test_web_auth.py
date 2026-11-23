@@ -176,6 +176,14 @@ class TestHostAndCors:
         assert "access-control-allow-origin" not in r.headers
 
 
+class TestDashboardPage:
+    def test_every_api_call_goes_through_the_shared_request_function(self):
+        """A raw fetch() would skip the token and the 401 lock screen, so only request() may call it."""
+        html = (REPO_ROOT / "ui" / "index.html").read_text(encoding="utf-8")
+        assert html.count("fetch(") == 1
+        assert "async function request(" in html
+
+
 class TestStartup:
     def test_refuses_to_start_without_token(self, tmp_path, monkeypatch, env):
         monkeypatch.delenv("SDLC_UI_TOKEN")

@@ -51,6 +51,21 @@
       animation: shimmer 1.5s linear infinite;
       border-radius: 6px;
     }
+    /* Lock screen: shown whenever the dashboard has no valid access token */
+    .lock-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px; background:#080e1a; }
+    .lock-panel { width:100%; max-width:480px; background:#0f172a; border:1px solid #1e293b; border-radius:12px; padding:24px; }
+    .lock-panel h1 { font-size:20px; font-weight:700; color:#f1f5f9; margin:12px 0 8px; outline:none; }
+    .lock-text { font-size:16px; line-height:1.5; color:#94a3b8; margin:0; }
+    .lock-code { display:block; background:#0b1120; border:1px solid #1e293b; border-radius:8px; padding:12px 14px; margin:16px 0 24px; font-family:'JetBrains Mono',monospace; font-size:14px; color:#cbd5e1; overflow-x:auto; white-space:nowrap; }
+    .lock-label { display:block; font-size:14px; font-weight:600; color:#cbd5e1; margin-bottom:8px; }
+    .lock-row { display:flex; gap:10px; }
+    .lock-input { flex:1; min-width:0; height:44px; padding:0 14px; background:#0b1120; border:1px solid #334155; border-radius:8px; color:#e2e8f0; font-size:14px; font-family:'JetBrains Mono',monospace; }
+    .lock-btn { height:44px; padding:0 20px; border:none; border-radius:8px; background:#2563eb; color:#fff; font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; }
+    .lock-error { margin:8px 0 0; font-size:14px; color:#fca5a5; }
+    .lock-panel :focus-visible { outline:2px solid #60a5fa; outline-offset:2px; }
+    .lock-panel h1:focus-visible { outline:none; }
+    .lock-inline { font-family:'JetBrains Mono',monospace; font-size:14px; color:#cbd5e1; }
+    @media (max-width:480px) { .lock-row { flex-direction:column; } .lock-input { flex:none; width:100%; } .lock-btn { width:100%; } }
     .pulse-dot::after {
       content:''; position:absolute; inset:0; border-radius:50%;
       background:currentColor; animation: pulse-ring 1.4s ease-out infinite;
@@ -89,16 +104,92 @@
 <script type="text/babel">
 const { useState, useEffect, useCallback, useRef, useMemo } = React;
 
+// ─── Access token ─────────────────────────────────────────────────────────────
+// `python sdlc.py ui` prints a link ending in #token=<key>. The page saves the key
+// in sessionStorage first (it dies with the tab), then strips the fragment from the
+// address bar. An empty or malformed fragment counts as no token.
+const TOKEN_KEY = 'sdlc_ui_token';
+let memToken = '';
+const readToken = () => {
+  if(memToken) return memToken;
+  try { return sessionStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; }
+};
+const saveToken = t => {
+  memToken = t;
+  try { sessionStorage.setItem(TOKEN_KEY, t); } catch {}
+};
+const clearToken = () => {
+  memToken = '';
+  try { sessionStorage.removeItem(TOKEN_KEY); } catch {}
+};
+// Accepts a full dashboard link, "#token=...", "token=..." or the bare key.
+const parseToken = raw => {
+  const s = (raw||'').trim();
+  const m = s.match(/token=([^&\s]+)/);
+  let t = s;
+  if(m){ try { t = decodeURIComponent(m[1]); } catch { t = ''; } }
+  return /^[A-Za-z0-9_-]{16,}$/.test(t) ? t : '';
+};
+(() => {
+  if(!window.location.hash.includes('token=')) return;
+  const t = parseToken(window.location.hash);
+  if(t) saveToken(t);
+  history.replaceState(null, '', window.location.pathname + window.location.search);
+})();
+
 // ─── API ──────────────────────────────────────────────────────────────────────
+// One request function for every call: it sends the token, turns any 401 into the
+// lock screen (clearing the token and unmounting every page, which stops all
+// polling), and throws a real error for every other failure so nothing that went
+// wrong can look like an empty list or a successful approval.
+class AuthError extends Error {}
+class ApiError extends Error {
+  constructor(message, status){ super(message); this.status = status; }
+}
+let locked = false;
+const lockListeners = new Set();
+const onLock = fn => { lockListeners.add(fn); return () => lockListeners.delete(fn); };
+const lockDashboard = reason => {
+  if(locked) return;
+  locked = true;
+  clearToken();
+  lockListeners.forEach(fn => fn(reason));
+};
+const unlockDashboard = () => { locked = false; };
+
+async function request(path, opts={}) {
+  const token = readToken();
+  if(!token){ lockDashboard('none'); throw new AuthError('No access token'); }
+  let res;
+  try {
+    res = await fetch(path, { ...opts, headers: { ...(opts.headers||{}), Authorization: `Bearer ${token}` } });
+  } catch {
+    throw new ApiError('Cannot reach the dashboard server. Is `python sdlc.py ui` still running?', 0);
+  }
+  if(res.status === 401){ lockDashboard('ended'); throw new AuthError('Access token rejected'); }
+  if(!res.ok){
+    const ctype = res.headers.get('content-type') || '';
+    if(res.status === 400 && ctype.includes('text/plain'))
+      throw new ApiError('Wrong address: open the link printed by `sdlc.py ui`', 400);
+    let msg = `Server error (${res.status})`;
+    try {
+      const body = await res.json();
+      if(body && body.detail) msg = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail);
+    } catch {}
+    throw new ApiError(msg, res.status);
+  }
+  return res.json();
+}
+
 const api = {
-  runs:     (limit=100) => fetch(`/api/runs?limit=${limit}`).then(r=>r.json()),
-  run:      id => fetch(`/api/runs/${id}`).then(r=>r.json()),
-  stages:   id => fetch(`/api/runs/${id}/stages`).then(r=>r.json()),
-  artifact: (id,s) => fetch(`/api/runs/${id}/artifacts/${s}`).then(r=>r.json()),
-  kanban:   id => fetch(`/api/runs/${id}/kanban`).then(r=>r.json()),
-  audit:    id => fetch(`/api/runs/${id}/audit`).then(r=>r.json()),
-  cost:     id => fetch(`/api/runs/${id}/cost`).then(r=>r.json()),
-  approve:  (id,body) => fetch(`/api/runs/${id}/approve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json()),
+  runs:     (limit=100) => request(`/api/runs?limit=${limit}`),
+  run:      id => request(`/api/runs/${id}`),
+  stages:   id => request(`/api/runs/${id}/stages`),
+  artifact: (id,s) => request(`/api/runs/${id}/artifacts/${s}`),
+  kanban:   id => request(`/api/runs/${id}/kanban`),
+  audit:    id => request(`/api/runs/${id}/audit`),
+  cost:     id => request(`/api/runs/${id}/cost`),
+  approve:  (id,body) => request(`/api/runs/${id}/approve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -174,6 +265,53 @@ const EmptyState = ({ icon, title, sub, code }) => (
     {code && <code style={{background:'#0f172a',border:'1px solid #1e293b',borderRadius:8,padding:'8px 16px',fontSize:12,color:'#94a3b8'}}>{code}</code>}
   </div>
 );
+
+// A failed request is an error, never an empty list.
+const ErrorState = ({ msg }) => (
+  <EmptyState icon="⚠️" title="Couldn't load this" sub={msg} />
+);
+
+// Full-screen lock: replaces the whole app when there is no valid access token.
+// reason 'none' = this tab never had a key (new tab, bookmark, bare address);
+// reason 'ended' = a key it held was rejected (server restarted or key changed).
+const LockScreen = ({ reason, onUnlock }) => {
+  const [paste,setPaste]=useState(''); const [err,setErr]=useState('');
+  const titleRef=useRef(null);
+  const ended = reason==='ended';
+  useEffect(()=>{ if(titleRef.current) titleRef.current.focus(); },[reason]);
+
+  const submit = e => {
+    e.preventDefault();
+    const t = parseToken(paste);
+    if(!t){ setErr('That is not a dashboard link or access key'); return; }
+    setErr(''); setPaste(''); saveToken(t); unlockDashboard(); onUnlock();
+  };
+
+  return (
+    <main className="lock-wrap">
+      <div className="lock-panel" role={ended?'alert':undefined}>
+        <span aria-hidden="true" style={{fontSize:32}}>🔒</span>
+        <h1 tabIndex={-1} ref={titleRef}>{ended?'Session ended':'Dashboard locked'}</h1>
+        <p className="lock-text">
+          {ended
+            ? 'The server was restarted or the key changed. Open the new link from your terminal.'
+            : <>Open the link that <code className="lock-inline">sdlc.py ui</code> printed in your terminal. It includes your access key.</>}
+        </p>
+        <code className="lock-code" tabIndex={0}>python sdlc.py ui</code>
+        <form onSubmit={submit} noValidate>
+          <label className="lock-label" htmlFor="lock-paste">Paste your dashboard link or access key</label>
+          <div className="lock-row">
+            <input id="lock-paste" className="lock-input" type="text" autoComplete="off" spellCheck={false}
+              value={paste} onChange={e=>setPaste(e.target.value)}
+              aria-invalid={err?'true':undefined} aria-describedby={err?'lock-paste-error':undefined} />
+            <button type="submit" className="lock-btn">Open dashboard</button>
+          </div>
+          {err && <p id="lock-paste-error" className="lock-error" role="alert">{err}</p>}
+        </form>
+      </div>
+    </main>
+  );
+};
 
 // ─── Stat Cards ───────────────────────────────────────────────────────────────
 const StatCards = ({ runs }) => {
@@ -320,13 +458,17 @@ const JsonViewer = ({ data }) => {
 
 // ─── Artifact Tab ─────────────────────────────────────────────────────────────
 const ArtifactTab = ({ runId, stage }) => {
-  const [data,setData]=useState(null); const [loading,setLoading]=useState(true);
+  const [data,setData]=useState(null); const [loading,setLoading]=useState(true); const [err,setErr]=useState(null);
   useEffect(()=>{
-    setLoading(true); setData(null);
-    api.artifact(runId,stage.name).then(setData).catch(()=>setData(null)).finally(()=>setLoading(false));
+    setLoading(true); setData(null); setErr(null);
+    // 404 means the stage has no output yet (a real empty state); anything else is an error.
+    api.artifact(runId,stage.name).then(setData)
+      .catch(e=>{ if(!(e instanceof AuthError) && e.status!==404) setErr(e); })
+      .finally(()=>setLoading(false));
   },[runId,stage.name]);
 
   if(loading) return <div style={{display:'flex',flexDirection:'column',gap:8}}>{[...Array(6)].map((_,i)=><Skeleton key={i} h="16px" w={`${70+Math.random()*30}%`}/>)}</div>;
+  if(err) return <ErrorState msg={err.message}/>;
   if(!data) return <EmptyState icon="📭" title="No artifact yet" sub="This stage hasn't produced output yet." />;
   return (
     <div>
@@ -343,9 +485,10 @@ const ArtifactTab = ({ runId, stage }) => {
 
 // ─── Kanban Tab ───────────────────────────────────────────────────────────────
 const KanbanTab = ({ runId }) => {
-  const [tasks,setTasks]=useState([]); const [loading,setLoading]=useState(true);
-  useEffect(()=>{ api.kanban(runId).then(setTasks).catch(()=>setTasks([])).finally(()=>setLoading(false)); },[runId]);
+  const [tasks,setTasks]=useState([]); const [loading,setLoading]=useState(true); const [err,setErr]=useState(null);
+  useEffect(()=>{ api.kanban(runId).then(setTasks).catch(e=>{ if(!(e instanceof AuthError)) setErr(e); }).finally(()=>setLoading(false)); },[runId]);
   if(loading) return <Skeleton h="120px" />;
+  if(err) return <ErrorState msg={err.message}/>;
   if(!tasks.length) return <EmptyState icon="📋" title="No tasks yet" sub="Kanban tasks appear when the development stage starts." />;
 
   const cols = ['pending','in_progress','blocked','done'];
@@ -379,9 +522,10 @@ const KanbanTab = ({ runId }) => {
 
 // ─── Audit Tab ────────────────────────────────────────────────────────────────
 const AuditTab = ({ runId }) => {
-  const [log,setLog]=useState([]); const [loading,setLoading]=useState(true);
-  useEffect(()=>{ api.audit(runId).then(setLog).catch(()=>setLog([])).finally(()=>setLoading(false)); },[runId]);
+  const [log,setLog]=useState([]); const [loading,setLoading]=useState(true); const [err,setErr]=useState(null);
+  useEffect(()=>{ api.audit(runId).then(setLog).catch(e=>{ if(!(e instanceof AuthError)) setErr(e); }).finally(()=>setLoading(false)); },[runId]);
   if(loading) return <Skeleton h="80px"/>;
+  if(err) return <ErrorState msg={err.message}/>;
   if(!log.length) return <EmptyState icon="📜" title="No audit entries" sub="Decisions appear here after HITL gates." />;
 
   const decisionStyle = { APPROVED:{color:'#10b981',bg:'rgba(16,185,129,.1)'}, REJECTED:{color:'#ef4444',bg:'rgba(239,68,68,.1)'}, AMENDED:{color:'#f59e0b',bg:'rgba(245,158,11,.1)'} };
@@ -413,9 +557,10 @@ const AuditTab = ({ runId }) => {
 
 // ─── Cost Tab ─────────────────────────────────────────────────────────────────
 const CostTab = ({ runId }) => {
-  const [data,setData]=useState(null); const [loading,setLoading]=useState(true);
-  useEffect(()=>{ api.cost(runId).then(setData).catch(()=>setData(null)).finally(()=>setLoading(false)); },[runId]);
+  const [data,setData]=useState(null); const [loading,setLoading]=useState(true); const [err,setErr]=useState(null);
+  useEffect(()=>{ api.cost(runId).then(setData).catch(e=>{ if(!(e instanceof AuthError)) setErr(e); }).finally(()=>setLoading(false)); },[runId]);
   if(loading) return <Skeleton h="120px"/>;
+  if(err) return <ErrorState msg={err.message}/>;
   if(!data||!data.items?.length) return <EmptyState icon="💰" title="No cost data" sub="Token usage is recorded when the pipeline runs with a live API key." />;
 
   const maxCost = Math.max(...data.items.map(r=>r.cost_usd||0));
@@ -463,12 +608,33 @@ const CostTab = ({ runId }) => {
 };
 
 // ─── Approval Modal ───────────────────────────────────────────────────────────
-const ApprovalModal = ({ runId, stage, artifact, onClose, onDone }) => {
+// A half-written approval (rationale and amended JSON) is kept in localStorage per run and
+// stage, so a server restart, the lock screen, or a new tab opened from the terminal link
+// does not lose it. It is cleared once the decision is accepted.
+const draftKey = (runId,stage) => `sdlc_ui_draft:${runId}:${stage}`;
+const loadDraft = (runId,stage) => {
+  try { return JSON.parse(localStorage.getItem(draftKey(runId,stage)) || 'null') || {}; } catch { return {}; }
+};
+const saveDraft = (runId,stage,draft) => {
+  try { localStorage.setItem(draftKey(runId,stage), JSON.stringify(draft)); } catch {}
+};
+const clearDraft = (runId,stage) => {
+  try { localStorage.removeItem(draftKey(runId,stage)); } catch {}
+};
+
+const ApprovalModal = ({ runId, stage, artifact, onClose, onDone, onError }) => {
+  const defaultJson = useMemo(()=>JSON.stringify(artifact,null,2),[artifact]);
+  const draft = useMemo(()=>loadDraft(runId,stage.name),[runId,stage.name]);
   const [decision,setDecision]=useState('APPROVED');
-  const [rationale,setRationale]=useState('');
-  const [amendedJson,setAmendedJson]=useState(JSON.stringify(artifact,null,2));
+  const [rationale,setRationale]=useState(draft.rationale || '');
+  const [amendedJson,setAmendedJson]=useState(draft.amendedJson ?? defaultJson);
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState('');
+
+  useEffect(()=>{
+    if(!rationale && amendedJson===defaultJson) clearDraft(runId,stage.name);
+    else saveDraft(runId,stage.name,{rationale,amendedJson});
+  },[rationale,amendedJson]);
 
   const submit = async () => {
     setLoading(true); setError('');
@@ -477,9 +643,14 @@ const ApprovalModal = ({ runId, stage, artifact, onClose, onDone }) => {
       if(decision==='AMENDED'){
         try { body.amended_artifact=JSON.parse(amendedJson); } catch { setError('Invalid JSON in amended artifact'); setLoading(false); return; }
       }
-      await api.approve(runId, body);
+      await api.approve(runId, body);   // throws unless the server answered OK
+      clearDraft(runId,stage.name);
       onDone(decision);
-    } catch(e){ setError(e.message); } finally { setLoading(false); }
+    } catch(e){
+      if(e instanceof AuthError) return;   // the lock screen takes over; the draft stays saved
+      setError(e.message);
+      if(onError) onError(e.message);
+    } finally { setLoading(false); }
   };
 
   const btnStyle = decision==='APPROVED'?'approve-btn':decision==='REJECTED'?'reject-btn':'amend-btn';
@@ -563,20 +734,27 @@ const RunDetail = ({ runId, onBack }) => {
   const [toast,setToast]=useState(null);
   const iv=useRef(null);
 
+  const [runErr,setRunErr]=useState(null);
+
   const refresh=useCallback(()=>{
-    api.run(runId).then(d=>{ setRun(d); setLoading(false);
+    api.run(runId).then(d=>{ setRun(d); setRunErr(null); setLoading(false);
       if(!selected && d.stages?.length) setSelected(s=>s||d.stages.find(x=>x.status==='running')||d.stages.find(x=>x.status==='approved')||d.stages[0]);
-    }).catch(()=>setLoading(false));
+    }).catch(e=>{ if(!(e instanceof AuthError)) setRunErr(e); setLoading(false); });
   },[runId]);
 
   useEffect(()=>{ refresh(); iv.current=setInterval(refresh,5000); return()=>clearInterval(iv.current); },[refresh]);
 
   const openApproval=async(stage)=>{
-    const artifact=await api.artifact(runId,stage.name);
-    setApprovalData({stage,artifact});
+    try {
+      const artifact=await api.artifact(runId,stage.name);
+      setApprovalData({stage,artifact});
+    } catch(e){
+      if(!(e instanceof AuthError)) setToast({msg:e.message,type:'error'});
+    }
   };
 
   if(loading) return <div style={{padding:32}}><Skeleton h="28px" w="300px" mb="16px"/><Skeleton h="120px"/></div>;
+  if(!run && runErr && runErr.status!==404) return <ErrorState msg={runErr.message}/>;
   if(!run) return <EmptyState icon="🔍" title="Run not found" />;
 
   const tabs=[['artifact','Artifact'],['kanban','Kanban'],['audit','Audit Log'],['cost','Cost']];
@@ -665,6 +843,7 @@ const RunDetail = ({ runId, onBack }) => {
       {approvalData && (
         <ApprovalModal runId={runId} stage={approvalData.stage} artifact={approvalData.artifact}
           onClose={()=>setApprovalData(null)}
+          onError={(msg)=>setToast({msg,type:'error'})}
           onDone={(d)=>{ setApprovalData(null); setToast({msg:`Stage ${d.toLowerCase()} successfully`,type:'success'}); refresh(); }}
         />
       )}
@@ -677,9 +856,14 @@ const RunDetail = ({ runId, onBack }) => {
 const RunsPage = ({ onSelect }) => {
   const [runs,setRuns]=useState([]); const [loading,setLoading]=useState(true);
   const [filter,setFilter]=useState('all');
+  const [err,setErr]=useState(null);
   const iv=useRef(null);
 
-  const refresh=()=>{ api.runs().then(setRuns).catch(()=>{}).finally(()=>setLoading(false)); };
+  const refresh=()=>{
+    api.runs().then(d=>{ setRuns(d); setErr(null); })
+      .catch(e=>{ if(!(e instanceof AuthError)) setErr(e); })
+      .finally(()=>setLoading(false));
+  };
   useEffect(()=>{ refresh(); iv.current=setInterval(refresh,5000); return()=>clearInterval(iv.current); },[]);
 
   const filtered=useMemo(()=>filter==='all'?runs:runs.filter(r=>r.status===filter),[runs,filter]);
@@ -704,7 +888,7 @@ const RunsPage = ({ onSelect }) => {
         </div>
       </div>
 
-      <RunTable runs={filtered} onSelect={onSelect} loading={loading}/>
+      {err && !runs.length ? <ErrorState msg={err.message}/> : <RunTable runs={filtered} onSelect={onSelect} loading={loading}/>}
     </div>
   );
 };
@@ -713,9 +897,15 @@ const RunsPage = ({ onSelect }) => {
 const App = () => {
   const [page,setPage]=useState('runs');
   const [runId,setRunId]=useState(null);
+  // No token in this tab: show the lock screen before any request is sent.
+  const [lockReason,setLockReason]=useState(()=>readToken()?null:'none');
+  useEffect(()=>onLock(setLockReason),[]);
 
   const navTo=(r)=>{ setRunId(r); setPage('detail'); };
   const navBack=()=>{ setRunId(null); setPage('runs'); };
+
+  // Replacing the whole app unmounts every page, which also stops all polling.
+  if(lockReason) return <LockScreen reason={lockReason} onUnlock={()=>setLockReason(null)}/>;
 
   return (
     <div style={{display:'flex',height:'100vh',overflow:'hidden'}}>
