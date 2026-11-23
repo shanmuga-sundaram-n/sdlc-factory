@@ -14,7 +14,6 @@ from __future__ import annotations
 from unittest.mock import patch, MagicMock
 from typing import List, Dict
 
-import pytest
 
 from core.context_compressor import ContextCompressor
 
@@ -98,7 +97,7 @@ class TestMaybeCompress:
     def test_few_messages_not_compressed(self):
         c = ContextCompressor(threshold_tokens=50, keep_recent=6)
         msgs = _make_messages(4, content_size=100)  # fewer than keep_recent
-        with patch("core.agent_runtime.call_model_openai", return_value=_SUMMARY_RESPONSE) as m:
+        with patch("core.agent_runtime.call_model_openai", return_value=_SUMMARY_RESPONSE):
             result = c.maybe_compress(msgs)
         # _compress skips when len <= keep_recent; may still be called with large msgs
         # Just verify no crash and same count or fewer
@@ -125,7 +124,6 @@ class TestAgentConfigCompressor:
         """Verify ContextCompressor.maybe_compress is called during _run_loop."""
         from core.agent_base import AgentConfig, BaseSDLCAgent
         from core.memory import ArtifactBundle
-        from unittest.mock import MagicMock
 
         compressor = MagicMock(spec=ContextCompressor)
         compressor.maybe_compress.side_effect = lambda msgs, system="": msgs

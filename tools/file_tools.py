@@ -12,11 +12,9 @@ Tools exposed:
 
 from __future__ import annotations
 
-import fnmatch
 import json
 import logging
 import re
-from pathlib import Path
 from typing import Optional
 
 from core.registry import registry, tool_error

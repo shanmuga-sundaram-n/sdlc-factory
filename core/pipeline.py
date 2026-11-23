@@ -14,15 +14,13 @@ from __future__ import annotations
 import json
 import logging
 import os
-import threading
-import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from core.memory import ArtifactBundle, ProjectMemory, PromptInjectionError, scan_for_injection
+from core.memory import ArtifactBundle, ProjectMemory, scan_for_injection
 from core.session import PipelineDB, get_default_db
 from core.telemetry import pipeline_span, stage_span
 from gateway.hitl import Decision, HITLGateway
@@ -357,9 +355,6 @@ class SDLCPipeline:
         timeout = stage_def.max_agent_timeout
 
         tasks = self._build_development_tasks(stage_def, pr)
-
-        results: Dict[str, Any] = {}
-        result_lock = threading.Lock()
 
         # Approval callback for subagent threads
         def _subagent_approval(command: str, description: str, **kwargs) -> str:

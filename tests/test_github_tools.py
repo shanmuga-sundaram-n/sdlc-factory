@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 from unittest.mock import patch, MagicMock
 
-import pytest
 
 # Ensure tools module is importable
 import tools._context  # noqa: F401
@@ -53,7 +52,6 @@ class TestGhListPrs:
         assert result["prs"] == []
 
     def test_gh_not_found(self):
-        import subprocess
         with patch("tools.github_tool.subprocess.run",
                    side_effect=FileNotFoundError), _patch_workspace():
             from tools.github_tool import _gh_list_prs

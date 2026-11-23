@@ -17,7 +17,7 @@ Then in _run_loop, before each model call:
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 

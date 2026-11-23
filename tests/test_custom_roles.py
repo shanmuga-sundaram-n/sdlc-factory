@@ -120,7 +120,6 @@ def _make_instance(cls):
     from unittest.mock import MagicMock
     from core.agent_base import AgentConfig
     from core.memory import ArtifactBundle, ProjectMemory
-    from pathlib import Path
     cfg = AgentConfig(role=cls.ROLE)
     pm = MagicMock(spec=ProjectMemory)
     ab = ArtifactBundle("run-test")

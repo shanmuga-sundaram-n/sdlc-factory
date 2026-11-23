@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
-    from core.session import PipelineDB
+    pass
 
 _local = threading.local()
 

@@ -14,9 +14,7 @@ from __future__ import annotations
 
 import json
 import threading
-from pathlib import Path
-from typing import Any, Dict
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -535,7 +533,7 @@ class TestPipelineHITLIntegration:
     def test_amended_clears_downstream_artifacts(self, mock_model, auto_config, tmp_path):
         """AMENDED decision at requirements should clear architecture and beyond."""
         db = PipelineDB(tmp_path / "pipeline.db")
-        from core.pipeline import SDLC_STAGES, SDLCPipeline
+        from core.pipeline import SDLCPipeline
         from gateway.hitl import ApprovalQueue, ApprovalResponse
 
         amended_artifact = {

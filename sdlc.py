@@ -119,14 +119,14 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     db = get_default_db(tenant_id=tenant)
     pipeline = SDLCPipeline.from_dict(config, db=db)
-    print(f"\nSDLC Factory — starting pipeline run")
+    print("\nSDLC Factory — starting pipeline run")
     print(f"Idea: {args.idea}\n")
 
     result = pipeline.run(args.idea)
 
     run_id = result.get("run_id", "")
     print(f"\n{'='*60}")
-    print(f"Pipeline run completed:")
+    print("Pipeline run completed:")
     print(f"  run_id : {run_id}")
     print(f"  status : {result.get('status')}")
     if result.get("paused_at"):
@@ -143,7 +143,6 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 def cmd_resume(args: argparse.Namespace) -> int:
     from core.pipeline import SDLCPipeline
-    from core.session import get_default_db
 
     config = _load_config(args.config) if args.config else {}
     pipeline = SDLCPipeline.from_dict(config)

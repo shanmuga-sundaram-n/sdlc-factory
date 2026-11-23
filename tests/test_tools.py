@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
 import threading
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -55,7 +54,7 @@ class TestFileTools:
 
     def test_write_creates_parent_dirs(self, tmp_path):
         _set_ws(tmp_path)
-        from tools.file_tools import _write_file, _read_file
+        from tools.file_tools import _write_file
 
         _write_file("src/api/users.py", "# users\n")
         assert (tmp_path / "src" / "api" / "users.py").exists()
@@ -366,9 +365,8 @@ class TestWebTools:
 
 class TestToolDiscovery:
     def test_discover_tools_imports_all_modules(self):
-        from core.registry import discover_tools, ToolRegistry
+        from core.registry import discover_tools
 
-        reg = ToolRegistry()
         modules = discover_tools()
         assert "tools.file_tools" in modules
         assert "tools.terminal_tool" in modules
@@ -442,8 +440,10 @@ class TestToolContextInjection:
 
         t1 = threading.Thread(target=worker, args=("run-A",))
         t2 = threading.Thread(target=worker, args=("run-B",))
-        t1.start(); t2.start()
-        t1.join(); t2.join()
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
 
         assert results["run-A"] == "run-A"
         assert results["run-B"] == "run-B"

@@ -10,12 +10,9 @@ from __future__ import annotations
 
 import json
 import textwrap
-import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any, Dict
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
-import pytest
 
 from core.qa_loop import QALoop, _unwrap, _rewrap
 from core.session import PipelineDB
@@ -575,7 +572,7 @@ class TestPipelineQALoopHook:
         pipeline = SDLCPipeline.from_dict(config, db=db)
 
         with patch.object(pipeline, "_run_qa_loop", wraps=pipeline._run_qa_loop) as spy:
-            result = pipeline.run("Build a test app")
+            pipeline.run("Build a test app")
 
         assert spy.called, "_run_qa_loop was never called"
         call_args = spy.call_args
@@ -619,7 +616,6 @@ class TestPipelineQALoopHook:
 
         original_run_qa_loop = pipeline._run_qa_loop
         def capturing_run_qa_loop(pr, stage_def, initial):
-            from core.qa_loop import QALoop
             # Inspect what QALoop would get
             captured["max"] = config.get("qa", {}).get("max_fix_iterations", 3)
             return original_run_qa_loop(pr, stage_def, initial)

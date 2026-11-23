@@ -16,8 +16,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Optional
-from urllib.parse import quote_plus
 
 from core.registry import registry, tool_error
 

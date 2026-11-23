@@ -13,11 +13,9 @@ The run() loop is inherited from BaseSDLCAgent.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Dict, List
 
-from core.agent_base import BaseSDLCAgent, AgentConfig
-from core.memory import ArtifactBundle, ProjectMemory
-from core.session import PipelineDB
+from core.agent_base import BaseSDLCAgent
 
 
 # ---------------------------------------------------------------------------

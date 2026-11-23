@@ -11,10 +11,9 @@ Or directly:
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +26,7 @@ _UI_DIR = Path(__file__).parent.parent / "ui"
 def _get_app():
     try:
         from fastapi import FastAPI, HTTPException, Body
-        from fastapi.responses import HTMLResponse, JSONResponse
-        from fastapi.staticfiles import StaticFiles
+        from fastapi.responses import HTMLResponse
         from fastapi.middleware.cors import CORSMiddleware
     except ImportError as exc:
         raise RuntimeError(

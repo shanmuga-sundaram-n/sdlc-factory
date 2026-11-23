@@ -34,7 +34,6 @@ def load_custom_roles(
         logger.debug("Custom roles directory %s does not exist; skipping", target)
         return {}
 
-    from agents.custom_loader import _build_class  # self-import for testability
 
     loaded: Dict[str, Type] = {}
     for yaml_path in sorted(target.glob("*.yaml")):

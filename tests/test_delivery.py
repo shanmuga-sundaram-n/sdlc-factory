@@ -11,9 +11,7 @@ Covers:
 from __future__ import annotations
 
 import json
-import sys
 from argparse import Namespace
-from io import StringIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 

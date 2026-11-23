@@ -19,7 +19,6 @@ import json
 import logging
 import shlex
 import subprocess
-from pathlib import Path
 from typing import Optional
 
 from core.registry import registry, tool_error

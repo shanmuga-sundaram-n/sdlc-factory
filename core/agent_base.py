@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import threading
 import time
 import uuid
@@ -282,7 +281,7 @@ class BaseSDLCAgent:
         )
 
         try:
-            with agent_span(run_id, stage, self.ROLE, self._agent_id) as span:
+            with agent_span(run_id, stage, self.ROLE, self._agent_id):
                 messages, tokens_in, tokens_out = self._run_loop(
                     system_prompt=system_prompt,
                     messages=messages,
@@ -411,8 +410,6 @@ class BaseSDLCAgent:
 
         total_in = 0
         total_out = 0
-        scrubber = mm.make_scrubber()
-
         while True:
             if self._interrupted.is_set():
                 logger.info("[%s] %s: interrupt received, stopping loop", self._agent_id, self.ROLE)

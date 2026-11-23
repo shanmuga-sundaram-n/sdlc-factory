@@ -74,11 +74,8 @@ class TestSkillLibraryGet:
 class TestSkillTools:
     def test_skill_list_tool(self, lib):
         import json
-        from core.registry import ToolRegistry
-        from core.skill_library import get_skill_library
 
         # Use the library fixture directly, bypassing the module singleton
-        import tools.skill_tools  # ensure registered
         import core.skill_library as sl_mod
 
         original = sl_mod._default_library
@@ -96,7 +93,6 @@ class TestSkillTools:
         import json
         import core.skill_library as sl_mod
 
-        import tools.skill_tools  # ensure registered
 
         original = sl_mod._default_library
         sl_mod._default_library = lib
@@ -112,7 +108,6 @@ class TestSkillTools:
         import json
         import core.skill_library as sl_mod
 
-        import tools.skill_tools  # ensure registered
 
         original = sl_mod._default_library
         sl_mod._default_library = lib

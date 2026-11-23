@@ -230,10 +230,10 @@ class QALoop:
                 f"### {bug.get('id', 'BUG-?')}: {bug.get('title', 'Unknown')}",
                 f"**Severity**: {bug.get('severity', 'unknown')}",
                 f"**Related task**: {bug.get('related_task', 'n/a')}",
-                f"**Steps to reproduce**:",
-                f"```",
+                "**Steps to reproduce**:",
+                "```",
                 bug.get("steps_to_reproduce", "See bug title"),
-                f"```",
+                "```",
                 "",
             ]
 
