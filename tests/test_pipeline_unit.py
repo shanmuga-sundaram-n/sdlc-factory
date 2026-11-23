@@ -5,11 +5,8 @@ Patches call_model_openai at the boundary so every other layer is tested real.
 """
 
 import json
-import sqlite3
-import tempfile
 import threading
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -17,10 +14,10 @@ from core.memory import ArtifactBundle, ProjectMemory, StreamingContextScrubber,
 from core.session import PipelineDB
 from core.registry import ToolRegistry
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def tmp_workspace(tmp_path):
@@ -46,6 +43,7 @@ def artifact_bundle():
 # ---------------------------------------------------------------------------
 # ArtifactBundle tests
 # ---------------------------------------------------------------------------
+
 
 class TestArtifactBundle:
     def test_set_and_get_stage(self, artifact_bundle):
@@ -80,6 +78,7 @@ class TestArtifactBundle:
 # ---------------------------------------------------------------------------
 # StreamingContextScrubber tests
 # ---------------------------------------------------------------------------
+
 
 class TestStreamingContextScrubber:
     def test_strips_complete_span(self):
@@ -123,6 +122,7 @@ class TestStreamingContextScrubber:
 # ProjectMemory tests
 # ---------------------------------------------------------------------------
 
+
 class TestProjectMemory:
     def test_write_and_read(self, project_memory):
         project_memory.write("# Title\n\nContent")
@@ -147,6 +147,7 @@ class TestProjectMemory:
 # ---------------------------------------------------------------------------
 # PipelineDB tests
 # ---------------------------------------------------------------------------
+
 
 class TestPipelineDB:
     def test_create_and_get_run(self, db):
@@ -219,6 +220,7 @@ class TestPipelineDB:
 # ToolRegistry tests
 # ---------------------------------------------------------------------------
 
+
 class TestToolRegistry:
     def test_register_and_dispatch(self):
         reg = ToolRegistry()
@@ -283,9 +285,11 @@ class TestToolRegistry:
 # HITL AutoEvaluator tests
 # ---------------------------------------------------------------------------
 
+
 class TestAutoEvaluator:
     def test_quality_gate_passes_when_coverage_met(self):
         from gateway.hitl import AutoEvaluator, Decision
+
         ev = AutoEvaluator()
         decision, rationale = ev.evaluate(
             "quality_gate",
@@ -296,6 +300,7 @@ class TestAutoEvaluator:
 
     def test_quality_gate_fails_when_coverage_low(self):
         from gateway.hitl import AutoEvaluator, Decision
+
         ev = AutoEvaluator()
         decision, rationale = ev.evaluate(
             "quality_gate",
@@ -306,6 +311,7 @@ class TestAutoEvaluator:
 
     def test_open_questions_blocks_requirements(self):
         from gateway.hitl import AutoEvaluator, Decision
+
         ev = AutoEvaluator()
         decision, rationale = ev.evaluate(
             "requirements",
@@ -316,6 +322,7 @@ class TestAutoEvaluator:
 
     def test_non_blocking_stage_approves(self):
         from gateway.hitl import AutoEvaluator, Decision
+
         ev = AutoEvaluator()
         decision, _ = ev.evaluate("architecture", {"adrs": []}, {})
         assert decision == Decision.APPROVED
@@ -325,9 +332,11 @@ class TestAutoEvaluator:
 # ApprovalQueue tests
 # ---------------------------------------------------------------------------
 
+
 class TestApprovalQueue:
     def test_submit_and_resolve(self):
         from gateway.hitl import ApprovalQueue, ApprovalRequest, ApprovalResponse, Decision
+
         q = ApprovalQueue()
         req = ApprovalRequest("r1", "run1", "architecture", {"foo": "bar"})
         q.submit(req)
@@ -336,6 +345,7 @@ class TestApprovalQueue:
 
         def _resolve():
             import time
+
             time.sleep(0.05)
             q.resolve(response)
 
@@ -346,6 +356,7 @@ class TestApprovalQueue:
 
     def test_timeout_returns_none(self):
         from gateway.hitl import ApprovalQueue, ApprovalRequest
+
         q = ApprovalQueue()
         req = ApprovalRequest("r2", "run2", "discovery", {})
         q.submit(req)
@@ -354,6 +365,7 @@ class TestApprovalQueue:
 
     def test_list_pending(self):
         from gateway.hitl import ApprovalQueue, ApprovalRequest
+
         q = ApprovalQueue()
         q.submit(ApprovalRequest("r3", "run3", "discovery", {}))
         q.submit(ApprovalRequest("r4", "run3", "requirements", {}))
@@ -399,10 +411,18 @@ _ROLE_ARTIFACTS = {
             }
         ],
         "non_functional_requirements": [
-            {"id": "NFR-001", "category": "security", "description": "Passwords stored as bcrypt hashes."}
+            {
+                "id": "NFR-001",
+                "category": "security",
+                "description": "Passwords stored as bcrypt hashes.",
+            }
         ],
         "data_dictionary": [
-            {"entity": "User", "attributes": ["email: string, unique"], "constraints": ["Email must be verified"]}
+            {
+                "entity": "User",
+                "attributes": ["email: string, unique"],
+                "constraints": ["Email must be verified"],
+            }
         ],
         "process_flows": [
             {"name": "Registration", "steps": ["Submit form", "Validate", "Create account"]}
@@ -419,7 +439,10 @@ _ROLE_ARTIFACTS = {
                 "context": "Need a lightweight async API framework.",
                 "options_considered": ["FastAPI", "Flask", "Django"],
                 "decision": "FastAPI — async, auto-generated OpenAPI docs.",
-                "consequences": {"positive": ["Auto-generated docs"], "negative": ["Smaller ecosystem than Django"]},
+                "consequences": {
+                    "positive": ["Auto-generated docs"],
+                    "negative": ["Smaller ecosystem than Django"],
+                },
             }
         ],
         "c4_context": "graph LR\n  User --> App",
@@ -641,6 +664,6 @@ class TestPipelineE2E:
         # Resume should skip all already-approved stages → no extra model calls
         result2 = pipeline.run("", resume_run_id=run_id)
         assert result2["status"] == "completed"
-        assert mock_model.call_count == first_call_count, (
-            "Resume should not call the model again for already-approved stages"
-        )
+        assert (
+            mock_model.call_count == first_call_count
+        ), "Resume should not call the model again for already-approved stages"

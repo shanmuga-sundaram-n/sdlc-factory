@@ -12,17 +12,15 @@ from __future__ import annotations
 
 import os
 import textwrap
-from pathlib import Path
 
-import pytest
 
 from core.session import PipelineDB
 from core.tenant import TenantConfig
 
-
 # ---------------------------------------------------------------------------
 # DB isolation helpers
 # ---------------------------------------------------------------------------
+
 
 class TestTenantDBIsolation:
     def test_runs_scoped_by_tenant(self, tmp_path):
@@ -69,8 +67,8 @@ class TestTenantDBIsolation:
 
     def test_default_tenant_isolated(self, tmp_path):
         db_path = tmp_path / "pipeline.db"
-        db_default = PipelineDB(db_path)          # tenant_id="default"
-        db_other   = PipelineDB(db_path, tenant_id="other")
+        db_default = PipelineDB(db_path)  # tenant_id="default"
+        db_other = PipelineDB(db_path, tenant_id="other")
 
         db_default.create_run("run-d1", "idea default", {})
         db_other.create_run("run-o1", "idea other", {})
@@ -93,14 +91,17 @@ class TestTenantDBIsolation:
 
     def test_schema_version_is_3(self, tmp_path):
         from core.session import SCHEMA_VERSION
+
         assert SCHEMA_VERSION == 3
 
     def test_new_db_has_tenant_id_column(self, tmp_path):
         db = PipelineDB(tmp_path / "pipeline.db")
         db.create_run("run-v3", "test", {})
-        row = db._conn().execute(
-            "SELECT tenant_id FROM pipeline_runs WHERE run_id='run-v3'"
-        ).fetchone()
+        row = (
+            db._conn()
+            .execute("SELECT tenant_id FROM pipeline_runs WHERE run_id='run-v3'")
+            .fetchone()
+        )
         assert row is not None
         assert row["tenant_id"] == "default"
 
@@ -114,6 +115,7 @@ class TestTenantDBIsolation:
 # ---------------------------------------------------------------------------
 # TenantConfig
 # ---------------------------------------------------------------------------
+
 
 class TestTenantConfig:
     def test_load_from_env_file(self, tmp_path):

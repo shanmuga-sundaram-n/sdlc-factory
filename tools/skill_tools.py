@@ -29,10 +29,12 @@ def _skill_view(args: dict) -> str:
     content = library.get_skill(name)
     if content is None:
         available = [s["name"] for s in library.list_skills()]
-        return json.dumps({
-            "error": f"Skill {name!r} not found",
-            "available": available,
-        })
+        return json.dumps(
+            {
+                "error": f"Skill {name!r} not found",
+                "available": available,
+            }
+        )
     return json.dumps({"name": name, "content": content})
 
 

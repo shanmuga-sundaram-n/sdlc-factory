@@ -133,7 +133,8 @@ class QALoop:
             remaining = [b for b in inner.get("bugs", []) if b.get("severity") == "critical"]
             logger.info(
                 "Iteration %d complete: still %d critical bug(s) remaining",
-                attempt, len(remaining),
+                attempt,
+                len(remaining),
             )
 
         # All iterations exhausted — flag for HITL escalation
@@ -162,10 +163,7 @@ class QALoop:
         iteration: int,
     ) -> bool:
         """Create and dispatch developer fix tasks. Returns True if any ran."""
-        bugs = [
-            b for b in qa_inner.get("bugs", [])
-            if b.get("severity") in ("critical", "major")
-        ]
+        bugs = [b for b in qa_inner.get("bugs", []) if b.get("severity") in ("critical", "major")]
         if not bugs:
             return False
 
@@ -185,8 +183,11 @@ class QALoop:
                 run_id=pr.run_id,
                 title=f"[Fix i{iteration}] {len(task_bugs)} bug(s) from {original_task_id}",
                 assignee=role,
-                metadata={"iteration": iteration, "bugs": task_bugs,
-                          "original_task_id": original_task_id},
+                metadata={
+                    "iteration": iteration,
+                    "bugs": task_bugs,
+                    "original_task_id": original_task_id,
+                },
             )
 
             description = self._build_fix_description(pr, task_bugs, iteration)
@@ -213,9 +214,7 @@ class QALoop:
                 return task.get("assignee", "developer_backend")
         return "developer_backend"
 
-    def _build_fix_description(
-        self, pr: Any, bugs: List[Dict], iteration: int
-    ) -> str:
+    def _build_fix_description(self, pr: Any, bugs: List[Dict], iteration: int) -> str:
         lines = [
             f"## Fix Task — Iteration {iteration}",
             "",
@@ -230,10 +229,10 @@ class QALoop:
                 f"### {bug.get('id', 'BUG-?')}: {bug.get('title', 'Unknown')}",
                 f"**Severity**: {bug.get('severity', 'unknown')}",
                 f"**Related task**: {bug.get('related_task', 'n/a')}",
-                f"**Steps to reproduce**:",
-                f"```",
+                "**Steps to reproduce**:",
+                "```",
                 bug.get("steps_to_reproduce", "See bug title"),
-                f"```",
+                "```",
                 "",
             ]
 
@@ -243,7 +242,9 @@ class QALoop:
         if test_list:
             lines += ["## Failing Tests", ""]
             for t in test_list[:20]:
-                lines.append(f"- `{t.get('nodeid', t.get('test_id', '?'))}`: {t.get('message', '')[:120]}")
+                lines.append(
+                    f"- `{t.get('nodeid', t.get('test_id', '?'))}`: {t.get('message', '')[:120]}"
+                )
             lines.append("")
 
         lines += [
@@ -290,9 +291,7 @@ class QALoop:
             logger.info("Fix agent %s completed task %s", role, task_id)
             return True
 
-        logger.warning(
-            "Fix agent %s failed for task %s: %s", role, task_id, result.error
-        )
+        logger.warning("Fix agent %s failed for task %s: %s", role, task_id, result.error)
         return False
 
     def _rerun_qa(self, pr: Any, stage_def: Any) -> Optional[Dict[str, Any]]:

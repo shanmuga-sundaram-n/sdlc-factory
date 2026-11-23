@@ -14,15 +14,13 @@ from __future__ import annotations
 import json
 import logging
 import os
-import threading
-import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from core.memory import ArtifactBundle, ProjectMemory, PromptInjectionError, scan_for_injection
+from core.memory import ArtifactBundle, ProjectMemory, scan_for_injection
 from core.session import PipelineDB, get_default_db
 from core.telemetry import pipeline_span, stage_span
 from gateway.hitl import Decision, HITLGateway
@@ -33,35 +31,38 @@ logger = logging.getLogger(__name__)
 # Stage definitions
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class StageDefinition:
     name: str
-    agent_roles: List[str]               # roles that run in this stage
-    parallel: bool = False               # True → parallel fan-out of agent_roles
-    hitl_gate: bool = False              # True → pause for human approval
-    max_agent_timeout: float = 600.0     # seconds per agent
+    agent_roles: List[str]  # roles that run in this stage
+    parallel: bool = False  # True → parallel fan-out of agent_roles
+    hitl_gate: bool = False  # True → pause for human approval
+    max_agent_timeout: float = 600.0  # seconds per agent
     depends_on: List[str] = field(default_factory=list)  # prior stage names
 
 
 # The canonical SDLC pipeline stage order
 SDLC_STAGES: List[StageDefinition] = [
-    StageDefinition("discovery",    ["domain_expert", "product_owner"]),
-    StageDefinition("requirements", ["business_analyst"],         hitl_gate=True),
-    StageDefinition("architecture", ["architect"],                hitl_gate=True,
-                    max_agent_timeout=900.0),
-    StageDefinition("planning",     ["tech_lead"]),
-    StageDefinition("development",  ["developer_backend",
-                                     "developer_ui",
-                                     "developer_devops"],
-                    parallel=True, max_agent_timeout=900.0),
-    StageDefinition("quality_gate", ["qa_engineer"],             hitl_gate=True),
-    StageDefinition("delivery",     ["release_manager"],          hitl_gate=True),
+    StageDefinition("discovery", ["domain_expert", "product_owner"]),
+    StageDefinition("requirements", ["business_analyst"], hitl_gate=True),
+    StageDefinition("architecture", ["architect"], hitl_gate=True, max_agent_timeout=900.0),
+    StageDefinition("planning", ["tech_lead"]),
+    StageDefinition(
+        "development",
+        ["developer_backend", "developer_ui", "developer_devops"],
+        parallel=True,
+        max_agent_timeout=900.0,
+    ),
+    StageDefinition("quality_gate", ["qa_engineer"], hitl_gate=True),
+    StageDefinition("delivery", ["release_manager"], hitl_gate=True),
 ]
 
 
 # ---------------------------------------------------------------------------
 # PipelineRun state
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class PipelineRun:
@@ -77,6 +78,7 @@ class PipelineRun:
 # ---------------------------------------------------------------------------
 # SDLCPipeline
 # ---------------------------------------------------------------------------
+
 
 class SDLCPipeline:
     """The SDLC stage machine.
@@ -119,10 +121,12 @@ class SDLCPipeline:
     def _register_builtin_agents(self) -> None:
         """Import and register all built-in + custom agent role classes."""
         from agents.roles import AGENT_ROLE_MAP
+
         self._agent_registry.update(AGENT_ROLE_MAP)
         # Load custom YAML-defined roles (custom_roles/*.yaml); never raises
         try:
             from agents.custom_loader import load_custom_roles
+
             custom = load_custom_roles()
             self._agent_registry.update(custom)
         except Exception as exc:
@@ -200,10 +204,14 @@ class SDLCPipeline:
         completed_names = set()
         for stage_def in self.stages:
             if self.db.get_artifact(run_id, stage_def.name):
-                row = self.db._conn().execute(
-                    "SELECT status FROM stage_artifacts WHERE run_id=? AND stage=?",
-                    (run_id, stage_def.name),
-                ).fetchone()
+                row = (
+                    self.db._conn()
+                    .execute(
+                        "SELECT status FROM stage_artifacts WHERE run_id=? AND stage=?",
+                        (run_id, stage_def.name),
+                    )
+                    .fetchone()
+                )
                 if row and row["status"] == "approved":
                     completed_names.add(stage_def.name)
 
@@ -262,7 +270,9 @@ class SDLCPipeline:
                         config=gate_cfg,
                     )
                     actor = "auto" if gate_mode == "auto" else "operator"
-                    self.db.log_decision(pr.run_id, stage_def.name, decision.value, actor, rationale)
+                    self.db.log_decision(
+                        pr.run_id, stage_def.name, decision.value, actor, rationale
+                    )
                     logger.info("Stage %s gate: %s — %s", stage_def.name, decision.value, rationale)
                     span.set_attribute("gate.decision", decision.value)
                     span.set_attribute("gate.mode", gate_mode)
@@ -284,7 +294,9 @@ class SDLCPipeline:
                         stage_order = [s.name for s in self.stages]
                         cleared = self.db.clear_stages_after(pr.run_id, stage_def.name, stage_order)
                         if cleared:
-                            logger.info("AMENDED: cleared %d downstream stages: %s", len(cleared), cleared)
+                            logger.info(
+                                "AMENDED: cleared %d downstream stages: %s", len(cleared), cleared
+                            )
 
                 self.db.approve_artifact(pr.run_id, stage_def.name, approved_by="pipeline")
                 self._git_commit_stage(pr.workspace, stage_def.name)
@@ -358,16 +370,15 @@ class SDLCPipeline:
 
         tasks = self._build_development_tasks(stage_def, pr)
 
-        results: Dict[str, Any] = {}
-        result_lock = threading.Lock()
-
         # Approval callback for subagent threads
         def _subagent_approval(command: str, description: str, **kwargs) -> str:
             auto_approve = self.config.get("parallel", {}).get("subagent_auto_approve", False)
             if auto_approve:
                 logger.warning("Subagent auto-approved: %s", command)
                 return "once"
-            logger.warning("Subagent auto-denied: %s (set subagent_auto_approve: true to allow)", command)
+            logger.warning(
+                "Subagent auto-denied: %s (set subagent_auto_approve: true to allow)", command
+            )
             return "deny"
 
         def _run_task(task_spec: Dict[str, Any]) -> Tuple[str, Optional[Dict]]:
@@ -417,10 +428,7 @@ class SDLCPipeline:
         failed: List[str] = []
 
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            future_to_task = {
-                pool.submit(_run_task, t): t
-                for t in tasks
-            }
+            future_to_task = {pool.submit(_run_task, t): t for t in tasks}
             for future in as_completed(future_to_task, timeout=timeout + 30):
                 task_spec = future_to_task[future]
                 try:
@@ -437,7 +445,9 @@ class SDLCPipeline:
                     logger.error("Task %s raised: %s", task_spec["task_id"], exc)
 
         if failed:
-            logger.warning("Parallel stage %s: %d tasks failed: %s", stage_def.name, len(failed), failed)
+            logger.warning(
+                "Parallel stage %s: %d tasks failed: %s", stage_def.name, len(failed), failed
+            )
             if len(failed) == len(tasks):
                 return None
 
@@ -456,6 +466,7 @@ class SDLCPipeline:
     ) -> Dict[str, Any]:
         """Delegate to QALoop; returns the (possibly improved) QA artifact."""
         from core.qa_loop import QALoop
+
         qa_loop = QALoop(
             agent_registry=self._agent_registry,
             config=self.config,
@@ -518,30 +529,35 @@ class SDLCPipeline:
                     assignee=role,
                     metadata=card,
                 )
-                tasks.append({
-                    "role": role,
-                    "task_id": task_id,
-                    "description": (
-                        f"## Task: {card.get('title', '')}\n\n"
-                        f"{card.get('description', '')}\n\n"
-                        f"## Acceptance Criteria\n"
-                        + "\n".join(f"- {c}" for c in card.get("acceptance_criteria", []))
-                    ),
-                })
+                tasks.append(
+                    {
+                        "role": role,
+                        "task_id": task_id,
+                        "description": (
+                            f"## Task: {card.get('title', '')}\n\n"
+                            f"{card.get('description', '')}\n\n"
+                            f"## Acceptance Criteria\n"
+                            + "\n".join(f"- {c}" for c in card.get("acceptance_criteria", []))
+                        ),
+                    }
+                )
         else:
             # Fallback: one generic task per role in the stage
             for role in stage_def.agent_roles:
                 task_id = f"{stage_def.name}-{role}-{uuid.uuid4().hex[:6]}"
                 self.db.create_task(
-                    task_id=task_id, run_id=pr.run_id,
+                    task_id=task_id,
+                    run_id=pr.run_id,
                     title=f"{role} task for {stage_def.name}",
                     assignee=role,
                 )
-                tasks.append({
-                    "role": role,
-                    "task_id": task_id,
-                    "description": self._build_task_description(role, stage_def, pr),
-                })
+                tasks.append(
+                    {
+                        "role": role,
+                        "task_id": task_id,
+                        "description": self._build_task_description(role, stage_def, pr),
+                    }
+                )
 
         return tasks
 
@@ -556,10 +572,9 @@ class SDLCPipeline:
             f"Produce a JSON artifact as described in your output contract."
         )
 
-    def _build_agent_config(
-        self, role: str, stage_def: StageDefinition, pr: PipelineRun
-    ):
+    def _build_agent_config(self, role: str, stage_def: StageDefinition, pr: PipelineRun):
         from core.agent_base import AgentConfig
+
         agent_cfg = self.config.get("agents", {}).get(role, {})
         pipeline_cfg = self.config.get("pipeline", {})
         compress_cfg = self.config.get("context_compression", {})
@@ -571,6 +586,7 @@ class SDLCPipeline:
         if tenant_id != "default":
             try:
                 from core.tenant import TenantConfig
+
                 tc = TenantConfig.load(tenant_id)
                 api_key = tc.api_key or api_key
                 base_url = tc.base_url or base_url
@@ -582,6 +598,7 @@ class SDLCPipeline:
         if compress_cfg.get("enabled"):
             try:
                 from core.context_compressor import ContextCompressor
+
                 compressor = ContextCompressor(
                     model=compress_cfg.get("model", "claude-haiku-4-5"),
                     threshold_tokens=int(compress_cfg.get("threshold_tokens", 30_000)),
@@ -615,7 +632,9 @@ class SDLCPipeline:
     # Artifact disk persistence
     # ------------------------------------------------------------------
 
-    def _write_artifact_to_disk(self, workspace: Path, stage: str, artifact: Dict[str, Any]) -> None:
+    def _write_artifact_to_disk(
+        self, workspace: Path, stage: str, artifact: Dict[str, Any]
+    ) -> None:
         """Submit an async disk write for the stage artifact — pipeline is never blocked.
 
         The artifact is serialised to JSON in the calling thread (cheap, in-memory)
@@ -642,6 +661,7 @@ class SDLCPipeline:
     def _git_run(args: List[str], cwd: Path) -> bool:
         """Run a git command; return True on success, log and return False on failure."""
         import subprocess
+
         try:
             subprocess.run(
                 ["git"] + args,
@@ -680,6 +700,7 @@ class SDLCPipeline:
         self._git_run(["add", "-A"], workspace)
         # Only commit if there's something to commit
         import subprocess
+
         try:
             result = subprocess.run(
                 ["git", "diff", "--cached", "--quiet"],
@@ -703,6 +724,7 @@ class SDLCPipeline:
     @classmethod
     def from_config(cls, config_path: str) -> "SDLCPipeline":
         import yaml
+
         with open(config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f)
         return cls(config=config)

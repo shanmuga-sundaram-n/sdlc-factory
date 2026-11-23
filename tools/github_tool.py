@@ -56,8 +56,16 @@ def _gh_list_prs(args: dict) -> str:
     workspace = str(safe_resolve(""))
 
     result = _run_gh(
-        ["pr", "list", "--state", state, "--limit", str(limit), "--json",
-         "number,title,author,headRefName,state,url"],
+        [
+            "pr",
+            "list",
+            "--state",
+            state,
+            "--limit",
+            str(limit),
+            "--json",
+            "number,title,author,headRefName,state,url",
+        ],
         cwd=workspace,
     )
     if result["returncode"] != 0:
@@ -120,7 +128,7 @@ def _gh_request_review(args: dict) -> str:
 
 def _gh_merge_pr(args: dict) -> str:
     pr_number = str(args.get("pr_number", ""))
-    method = args.get("method", "squash")      # squash | merge | rebase
+    method = args.get("method", "squash")  # squash | merge | rebase
     delete_branch = bool(args.get("delete_branch", True))
     workspace = str(safe_resolve(""))
 
@@ -151,8 +159,11 @@ registry.register(
         "parameters": {
             "type": "object",
             "properties": {
-                "state": {"type": "string", "enum": ["open", "closed", "merged", "all"],
-                          "description": "PR state filter (default: open)"},
+                "state": {
+                    "type": "string",
+                    "enum": ["open", "closed", "merged", "all"],
+                    "description": "PR state filter (default: open)",
+                },
                 "limit": {"type": "integer", "description": "Max PRs to return (default: 20)"},
             },
             "required": [],
@@ -190,10 +201,16 @@ registry.register(
             "type": "object",
             "properties": {
                 "pr_number": {"type": "integer", "description": "PR number"},
-                "reviewers": {"type": "array", "items": {"type": "string"},
-                              "description": "GitHub usernames to add as reviewers"},
-                "teams": {"type": "array", "items": {"type": "string"},
-                          "description": "GitHub team slugs (org/team-slug) to add"},
+                "reviewers": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "GitHub usernames to add as reviewers",
+                },
+                "teams": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "GitHub team slugs (org/team-slug) to add",
+                },
             },
             "required": ["pr_number"],
         },
@@ -210,10 +227,15 @@ registry.register(
             "type": "object",
             "properties": {
                 "pr_number": {"type": "integer", "description": "PR number"},
-                "method": {"type": "string", "enum": ["squash", "merge", "rebase"],
-                           "description": "Merge method (default: squash)"},
-                "delete_branch": {"type": "boolean",
-                                  "description": "Delete head branch after merge (default: true)"},
+                "method": {
+                    "type": "string",
+                    "enum": ["squash", "merge", "rebase"],
+                    "description": "Merge method (default: squash)",
+                },
+                "delete_branch": {
+                    "type": "boolean",
+                    "description": "Delete head branch after merge (default: true)",
+                },
             },
             "required": ["pr_number"],
         },

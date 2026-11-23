@@ -15,7 +15,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import queue
 import threading
 import time
 import uuid
@@ -30,10 +29,11 @@ logger = logging.getLogger(__name__)
 # Enums + data classes
 # ---------------------------------------------------------------------------
 
+
 class Decision(str, Enum):
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
-    AMENDED  = "AMENDED"
+    AMENDED = "AMENDED"
 
 
 @dataclass
@@ -59,6 +59,7 @@ class ApprovalResponse:
 # ApprovalQueue — threadsafe, supports timeout wait
 # ---------------------------------------------------------------------------
 
+
 class ApprovalQueue:
     """Async approval queue: producer posts a request, consumer resolves it.
 
@@ -80,7 +81,9 @@ class ApprovalQueue:
             self._events[request.request_id] = threading.Event()
         logger.info(
             "ApprovalQueue: submitted request %s (run=%s stage=%s)",
-            request.request_id, request.run_id, request.stage,
+            request.request_id,
+            request.run_id,
+            request.stage,
         )
 
     def resolve(self, response: ApprovalResponse) -> bool:
@@ -94,7 +97,9 @@ class ApprovalQueue:
             event.set()
         logger.info(
             "ApprovalQueue: resolved %s → %s by %s",
-            response.request_id, response.decision, response.actor,
+            response.request_id,
+            response.decision,
+            response.actor,
         )
         return True
 
@@ -124,6 +129,7 @@ class ApprovalQueue:
 # ---------------------------------------------------------------------------
 # Rule-based auto-evaluator
 # ---------------------------------------------------------------------------
+
 
 class AutoEvaluator:
     """Rule-based HITL gate for the auto mode.
@@ -194,9 +200,11 @@ class AutoEvaluator:
 # Slack delivery
 # ---------------------------------------------------------------------------
 
+
 def _post_to_slack(channel: str, text: str, token: str) -> Optional[str]:
     """Post a message to Slack and return the ts (message timestamp)."""
     import urllib.request
+
     payload = json.dumps({"channel": channel, "text": text}).encode()
     req = urllib.request.Request(
         "https://slack.com/api/chat.postMessage",
@@ -216,22 +224,22 @@ def _post_to_slack(channel: str, text: str, token: str) -> Optional[str]:
         return None
 
 
-def _poll_slack_reactions(channel: str, ts: str, token: str, timeout: float = 3600) -> Optional[str]:
+def _poll_slack_reactions(
+    channel: str, ts: str, token: str, timeout: float = 3600
+) -> Optional[str]:
     """Poll for a thumbsup/thumbsdown reaction on a Slack message."""
     import urllib.request
+
     deadline = time.time() + timeout
     while time.time() < deadline:
         time.sleep(15)
-        url = (
-            f"https://slack.com/api/reactions.get?channel={channel}&timestamp={ts}"
-        )
+        url = f"https://slack.com/api/reactions.get?channel={channel}&timestamp={ts}"
         req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read())
             reactions = {
-                r["name"]: r["count"]
-                for r in (data.get("message", {}).get("reactions") or [])
+                r["name"]: r["count"] for r in (data.get("message", {}).get("reactions") or [])
             }
             if "+1" in reactions or "white_check_mark" in reactions:
                 return "APPROVED"
@@ -245,6 +253,7 @@ def _poll_slack_reactions(channel: str, ts: str, token: str, timeout: float = 36
 # ---------------------------------------------------------------------------
 # HITLGateway — main class
 # ---------------------------------------------------------------------------
+
 
 class HITLGateway:
     """Flexible HITL governance gateway.
@@ -305,9 +314,7 @@ class HITLGateway:
     # CLI gate
     # ------------------------------------------------------------------
 
-    def _cli_gate(
-        self, stage: str, artifact: Any, config: Dict
-    ) -> Tuple[Decision, str, Any]:
+    def _cli_gate(self, stage: str, artifact: Any, config: Dict) -> Tuple[Decision, str, Any]:
         print(f"\n{'='*70}")
         print(f"  HITL APPROVAL GATE — Stage: {stage.upper()}")
         print(f"{'='*70}")
@@ -319,9 +326,7 @@ class HITLGateway:
 
         while True:
             try:
-                answer = input(
-                    "\n[y] Approve  [n] Reject  [e] Amend  > "
-                ).strip().lower()
+                answer = input("\n[y] Approve  [n] Reject  [e] Amend  > ").strip().lower()
             except (EOFError, KeyboardInterrupt):
                 return Decision.REJECTED, "cli: interrupted", artifact
 
@@ -365,7 +370,9 @@ class HITLGateway:
         self, stage: str, artifact: Any, run_id: str, config: Dict, timeout: float
     ) -> Tuple[Decision, str, Any]:
         token = os.getenv("SLACK_BOT_TOKEN", "")
-        channel = config.get("slack_channel", os.getenv("SLACK_APPROVAL_CHANNEL", "#sdlc-approvals"))
+        channel = config.get(
+            "slack_channel", os.getenv("SLACK_APPROVAL_CHANNEL", "#sdlc-approvals")
+        )
         if not token:
             logger.warning("SLACK_BOT_TOKEN not set; falling back to CLI gate")
             return self._cli_gate(stage, artifact, config)
@@ -398,20 +405,24 @@ class HITLGateway:
         self, stage: str, artifact: Any, run_id: str, config: Dict, timeout: float
     ) -> Tuple[Decision, str, Any]:
         import urllib.request
+
         webhook_url = config.get("webhook_url", os.getenv("HITL_WEBHOOK_URL", ""))
         if not webhook_url:
             logger.warning("HITL_WEBHOOK_URL not set; falling back to queue gate")
             return self._queue_gate(stage, artifact, run_id, timeout)
 
         request_id = str(uuid.uuid4())
-        payload = json.dumps({
-            "request_id": request_id,
-            "run_id": run_id,
-            "stage": stage,
-            "artifact_preview": json.dumps(artifact, ensure_ascii=False)[:3000],
-        }).encode()
+        payload = json.dumps(
+            {
+                "request_id": request_id,
+                "run_id": run_id,
+                "stage": stage,
+                "artifact_preview": json.dumps(artifact, ensure_ascii=False)[:3000],
+            }
+        ).encode()
         req = urllib.request.Request(
-            webhook_url, data=payload,
+            webhook_url,
+            data=payload,
             headers={"Content-Type": "application/json"},
             method="POST",
         )

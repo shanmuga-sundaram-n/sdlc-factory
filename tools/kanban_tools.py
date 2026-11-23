@@ -38,6 +38,7 @@ def _require_db():
 # kanban_create
 # ---------------------------------------------------------------------------
 
+
 def _kanban_create(
     task_id: str,
     title: str,
@@ -81,11 +82,17 @@ registry.register(
             "type": "object",
             "required": ["task_id", "title", "assignee"],
             "properties": {
-                "task_id":     {"type": "string", "description": "Unique task ID, e.g. 't-001'"},
-                "title":       {"type": "string", "description": "Short imperative task title"},
-                "assignee":    {"type": "string", "description": "Assignee role: developer_backend | developer_ui | developer_devops"},
+                "task_id": {"type": "string", "description": "Unique task ID, e.g. 't-001'"},
+                "title": {"type": "string", "description": "Short imperative task title"},
+                "assignee": {
+                    "type": "string",
+                    "description": "Assignee role: developer_backend | developer_ui | developer_devops",
+                },
                 "description": {"type": "string", "description": "Optional longer description"},
-                "metadata":    {"type": "object", "description": "Optional extra fields (acceptance_criteria, skills, etc.)"},
+                "metadata": {
+                    "type": "object",
+                    "description": "Optional extra fields (acceptance_criteria, skills, etc.)",
+                },
             },
         }
     },
@@ -97,6 +104,7 @@ registry.register(
 # ---------------------------------------------------------------------------
 # kanban_complete
 # ---------------------------------------------------------------------------
+
 
 def _kanban_complete(task_id: str, notes: str = "") -> str:
     """Mark a kanban task as done.
@@ -124,7 +132,7 @@ registry.register(
             "required": ["task_id"],
             "properties": {
                 "task_id": {"type": "string", "description": "Task ID to mark as done"},
-                "notes":   {"type": "string", "description": "Optional completion notes"},
+                "notes": {"type": "string", "description": "Optional completion notes"},
             },
         }
     },
@@ -136,6 +144,7 @@ registry.register(
 # ---------------------------------------------------------------------------
 # kanban_block
 # ---------------------------------------------------------------------------
+
 
 def _kanban_block(task_id: str, reason: str) -> str:
     """Mark a kanban task as blocked with a reason.
@@ -163,7 +172,7 @@ registry.register(
             "required": ["task_id", "reason"],
             "properties": {
                 "task_id": {"type": "string", "description": "Task ID to mark as blocked"},
-                "reason":  {"type": "string", "description": "What is blocking progress"},
+                "reason": {"type": "string", "description": "What is blocking progress"},
             },
         }
     },
@@ -175,6 +184,7 @@ registry.register(
 # ---------------------------------------------------------------------------
 # kanban_comment
 # ---------------------------------------------------------------------------
+
 
 def _kanban_comment(task_id: str, comment: str, author: str = "agent") -> str:
     """Post a comment on a kanban task.
@@ -203,7 +213,7 @@ registry.register(
             "properties": {
                 "task_id": {"type": "string", "description": "Task ID to comment on"},
                 "comment": {"type": "string", "description": "Comment text"},
-                "author":  {"type": "string", "description": "Author name/role. Default 'agent'"},
+                "author": {"type": "string", "description": "Author name/role. Default 'agent'"},
             },
         }
     },

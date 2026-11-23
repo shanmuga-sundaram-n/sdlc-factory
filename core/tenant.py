@@ -45,11 +45,13 @@ class TenantConfig:
                 if "=" in line:
                     key, _, val = line.partition("=")
                     creds[key.strip()] = val.strip()
-            logger.info("Loaded %d credentials for tenant %r from %s",
-                        len(creds), tenant_id, env_file)
+            logger.info(
+                "Loaded %d credentials for tenant %r from %s", len(creds), tenant_id, env_file
+            )
         else:
-            logger.debug("No tenant env file for %r (looked at %s); using process env",
-                         tenant_id, env_file)
+            logger.debug(
+                "No tenant env file for %r (looked at %s); using process env", tenant_id, env_file
+            )
         return cls(tenant_id=tenant_id, credentials=creds)
 
     def get(self, key: str, default: Optional[str] = None) -> Optional[str]:
@@ -68,8 +70,9 @@ class TenantConfig:
         """Overlay tenant credentials onto os.environ (process-wide, use with care)."""
         for key, val in self._creds.items():
             os.environ[key] = val
-        logger.debug("Applied %d tenant credentials to environment for %r",
-                     len(self._creds), self.tenant_id)
+        logger.debug(
+            "Applied %d tenant credentials to environment for %r", len(self._creds), self.tenant_id
+        )
 
     def __repr__(self) -> str:
         return f"TenantConfig(tenant_id={self.tenant_id!r}, keys={list(self._creds)})"

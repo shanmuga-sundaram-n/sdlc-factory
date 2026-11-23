@@ -45,16 +45,17 @@ def _parse_junit_xml(xml_path: Path) -> Dict[str, Any]:
                 for tag in ("failure", "error"):
                     elem = tc.find(tag)
                     if elem is not None:
-                        failures.append({
-                            "nodeid": nodeid,
-                            "kind": tag,
-                            "message": (elem.text or elem.get("message", ""))[:500],
-                        })
+                        failures.append(
+                            {
+                                "nodeid": nodeid,
+                                "kind": tag,
+                                "message": (elem.text or elem.get("message", ""))[:500],
+                            }
+                        )
 
         return {"passed": passed, "failed": failed, "errors": errors, "failures": failures}
     except ET.ParseError as exc:
-        return {"passed": 0, "failed": 0, "errors": 0, "failures": [],
-                "parse_error": str(exc)}
+        return {"passed": 0, "failed": 0, "errors": 0, "failures": [], "parse_error": str(exc)}
 
 
 def _parse_coverage_json(cov_path: Path) -> float:
@@ -101,7 +102,9 @@ def run_pytest(
     cov_path = cwd / ".coverage_report.json"
 
     cmd = [
-        "python", "-m", "pytest",
+        "python",
+        "-m",
+        "pytest",
         "--tb=short",
         f"--junitxml={xml_path}",
         f"--cov={cov_source}",
@@ -121,33 +124,48 @@ def run_pytest(
         stdout = proc.stdout[-_MAX_OUTPUT_BYTES:] if proc.stdout else ""
         return_code = proc.returncode
     except subprocess.TimeoutExpired:
-        return json.dumps({
-            "error": f"pytest timed out after {timeout}s",
-            "passed": 0, "failed": 0, "errors": 0,
-            "coverage_pct": 0.0, "failures": [],
-            "stdout": "", "return_code": -1,
-        })
+        return json.dumps(
+            {
+                "error": f"pytest timed out after {timeout}s",
+                "passed": 0,
+                "failed": 0,
+                "errors": 0,
+                "coverage_pct": 0.0,
+                "failures": [],
+                "stdout": "",
+                "return_code": -1,
+            }
+        )
     except FileNotFoundError:
-        return json.dumps({
-            "error": "python interpreter not found in PATH",
-            "passed": 0, "failed": 0, "errors": 0,
-            "coverage_pct": 0.0, "failures": [],
-            "stdout": "", "return_code": -1,
-        })
+        return json.dumps(
+            {
+                "error": "python interpreter not found in PATH",
+                "passed": 0,
+                "failed": 0,
+                "errors": 0,
+                "coverage_pct": 0.0,
+                "failures": [],
+                "stdout": "",
+                "return_code": -1,
+            }
+        )
 
     # If pytest-cov is unavailable, coverage stays 0 — that is intentional
     junit = _parse_junit_xml(xml_path)
     coverage_pct = _parse_coverage_json(cov_path)
 
-    return json.dumps({
-        "passed": junit["passed"],
-        "failed": junit["failed"],
-        "errors": junit["errors"],
-        "coverage_pct": coverage_pct,
-        "failures": junit.get("failures", []),
-        "stdout": stdout,
-        "return_code": return_code,
-    }, ensure_ascii=False)
+    return json.dumps(
+        {
+            "passed": junit["passed"],
+            "failed": junit["failed"],
+            "errors": junit["errors"],
+            "coverage_pct": coverage_pct,
+            "failures": junit.get("failures", []),
+            "stdout": stdout,
+            "return_code": return_code,
+        },
+        ensure_ascii=False,
+    )
 
 
 registry.register(
@@ -172,7 +190,7 @@ registry.register(
                 "args": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Extra pytest CLI arguments, e.g. [\"-k\", \"test_auth\"] or [\"-x\"].",
+                    "description": 'Extra pytest CLI arguments, e.g. ["-k", "test_auth"] or ["-x"].',
                 },
                 "xml_out": {
                     "type": "string",

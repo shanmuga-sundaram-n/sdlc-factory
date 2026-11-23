@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 import threading
 from pathlib import Path
@@ -29,13 +28,13 @@ _STAGE_CONTEXT_TAG = "stage-context"
 _FENCE_OPEN = f"<{_STAGE_CONTEXT_TAG}>"
 _FENCE_CLOSE = f"</{_STAGE_CONTEXT_TAG}>"
 
-_FENCE_TAG_RE = re.compile(rf'</?\s*{re.escape(_STAGE_CONTEXT_TAG)}\s*>', re.IGNORECASE)
+_FENCE_TAG_RE = re.compile(rf"</?\s*{re.escape(_STAGE_CONTEXT_TAG)}\s*>", re.IGNORECASE)
 _INTERNAL_CONTEXT_RE = re.compile(
-    rf'<\s*{re.escape(_STAGE_CONTEXT_TAG)}\s*>[\s\S]*?</\s*{re.escape(_STAGE_CONTEXT_TAG)}\s*>',
+    rf"<\s*{re.escape(_STAGE_CONTEXT_TAG)}\s*>[\s\S]*?</\s*{re.escape(_STAGE_CONTEXT_TAG)}\s*>",
     re.IGNORECASE,
 )
 _SYSTEM_NOTE_RE = re.compile(
-    r'\[System note:\s*The following is stage context[\s\S]*?\]\s*',
+    r"\[System note:\s*The following is stage context[\s\S]*?\]\s*",
     re.IGNORECASE,
 )
 
@@ -52,37 +51,56 @@ def sanitize_context(text: str) -> str:
 # Prompt injection scanner — applied to the user-supplied idea string
 # ---------------------------------------------------------------------------
 
+
 class PromptInjectionError(ValueError):
     """Raised when the idea string contains prompt injection patterns."""
 
 
 _INJECTION_PATTERNS: list[tuple[str, re.Pattern]] = [
-    ("role_override", re.compile(
-        r'\b(ignore|disregard|forget|override)\b.{0,40}\b(previous|prior|above|your)\b'
-        r'.{0,40}\b(instructions?|prompt|rules?|constraints?)\b',
-        re.IGNORECASE | re.DOTALL,
-    )),
-    ("persona_hijack", re.compile(
-        r'\b(you are now|act as|pretend (to be|you are)|your (new )?role is|from now on you)\b',
-        re.IGNORECASE,
-    )),
-    ("system_role_injection", re.compile(
-        r'(?m)^\s*(system|user|assistant)\s*:\s*\S',
-        re.IGNORECASE,
-    )),
-    ("fence_tag_injection", re.compile(
-        rf'<\s*{re.escape(_STAGE_CONTEXT_TAG)}',
-        re.IGNORECASE,
-    )),
-    ("jailbreak_keyword", re.compile(
-        r'\b(jailbreak|developer mode|DAN mode|do anything now)\b',
-        re.IGNORECASE,
-    )),
-    ("prompt_exfiltration", re.compile(
-        r'\b(reveal|print|show|output|repeat|tell me)\b.{0,30}'
-        r'\b(your (system )?prompt|your instructions?|above text)\b',
-        re.IGNORECASE | re.DOTALL,
-    )),
+    (
+        "role_override",
+        re.compile(
+            r"\b(ignore|disregard|forget|override)\b.{0,40}\b(previous|prior|above|your)\b"
+            r".{0,40}\b(instructions?|prompt|rules?|constraints?)\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+    ),
+    (
+        "persona_hijack",
+        re.compile(
+            r"\b(you are now|act as|pretend (to be|you are)|your (new )?role is|from now on you)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "system_role_injection",
+        re.compile(
+            r"(?m)^\s*(system|user|assistant)\s*:\s*\S",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "fence_tag_injection",
+        re.compile(
+            rf"<\s*{re.escape(_STAGE_CONTEXT_TAG)}",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "jailbreak_keyword",
+        re.compile(
+            r"\b(jailbreak|developer mode|DAN mode|do anything now)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "prompt_exfiltration",
+        re.compile(
+            r"\b(reveal|print|show|output|repeat|tell me)\b.{0,30}"
+            r"\b(your (system )?prompt|your instructions?|above text)\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+    ),
 ]
 
 
@@ -105,6 +123,7 @@ def scan_for_injection(text: str) -> None:
 # Strips <stage-context>…</stage-context> spans from a streaming token stream,
 # surviving chunk boundaries.
 # ---------------------------------------------------------------------------
+
 
 class StreamingContextScrubber:
     def __init__(self) -> None:
@@ -129,7 +148,7 @@ class StreamingContextScrubber:
                     held = self._max_partial_suffix(buf, _FENCE_CLOSE)
                     self._buf = buf[-held:] if held else ""
                     return "".join(out)
-                buf = buf[idx + len(_FENCE_CLOSE):]
+                buf = buf[idx + len(_FENCE_CLOSE) :]
                 self._in_span = False
             else:
                 idx = buf.lower().find(_FENCE_OPEN)
@@ -143,7 +162,7 @@ class StreamingContextScrubber:
                     return "".join(out)
                 if idx > 0:
                     out.append(buf[:idx])
-                buf = buf[idx + len(_FENCE_OPEN):]
+                buf = buf[idx + len(_FENCE_OPEN) :]
                 self._in_span = True
 
         return "".join(out)
@@ -171,6 +190,7 @@ class StreamingContextScrubber:
 # ---------------------------------------------------------------------------
 # ProjectMemory — Tier 1 (persistent, shared across all agents)
 # ---------------------------------------------------------------------------
+
 
 class ProjectMemory:
     """Reads/writes PROJECT_MEMORY.md in the workspace.
@@ -216,6 +236,7 @@ class ProjectMemory:
 # ---------------------------------------------------------------------------
 # ArtifactBundle — Tier 2 (per-stage artifacts injected as context)
 # ---------------------------------------------------------------------------
+
 
 class ArtifactBundle:
     """Accumulates structured artifacts from each pipeline stage.
@@ -274,6 +295,7 @@ class ArtifactBundle:
 # ---------------------------------------------------------------------------
 # MemoryManager — orchestrates both tiers for a single agent invocation
 # ---------------------------------------------------------------------------
+
 
 class MemoryManager:
     """Single integration point in BaseSDLCAgent.

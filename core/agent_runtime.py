@@ -29,6 +29,7 @@ def _get_openai():
         with _openai_lock:
             if _openai_mod is None:
                 import openai as _sdk
+
                 _openai_mod = _sdk
     return _openai_mod
 
@@ -39,6 +40,7 @@ def _get_anthropic():
         with _anthropic_lock:
             if _anthropic_mod is None:
                 import anthropic as _sdk
+
                 _anthropic_mod = _sdk
     return _anthropic_mod
 
@@ -69,11 +71,13 @@ def _convert_messages_for_anthropic(messages: List[Dict]) -> List[Dict]:
             raw_results = msg.get("content", [])
             content_blocks = []
             for r in raw_results:
-                content_blocks.append({
-                    "type": "tool_result",
-                    "tool_use_id": r.get("tool_call_id", r.get("id", "")),
-                    "content": r.get("content", ""),
-                })
+                content_blocks.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": r.get("tool_call_id", r.get("id", "")),
+                        "content": r.get("content", ""),
+                    }
+                )
             converted.append({"role": "user", "content": content_blocks})
 
         elif role == "assistant" and msg.get("tool_calls"):
@@ -89,12 +93,14 @@ def _convert_messages_for_anthropic(messages: List[Dict]) -> List[Dict]:
                     input_data = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
                 except (json.JSONDecodeError, TypeError):
                     input_data = {}
-                content_blocks.append({
-                    "type": "tool_use",
-                    "id": tc.get("id", ""),
-                    "name": fn.get("name", ""),
-                    "input": input_data,
-                })
+                content_blocks.append(
+                    {
+                        "type": "tool_use",
+                        "id": tc.get("id", ""),
+                        "name": fn.get("name", ""),
+                        "input": input_data,
+                    }
+                )
             converted.append({"role": "assistant", "content": content_blocks})
 
         else:
@@ -129,11 +135,13 @@ def _call_via_anthropic_sdk(
     if tools:
         for t in tools:
             fn = t.get("function", {})
-            anthropic_tools.append({
-                "name": fn.get("name", ""),
-                "description": fn.get("description", ""),
-                "input_schema": fn.get("parameters", {"type": "object", "properties": {}}),
-            })
+            anthropic_tools.append(
+                {
+                    "name": fn.get("name", ""),
+                    "description": fn.get("description", ""),
+                    "input_schema": fn.get("parameters", {"type": "object", "properties": {}}),
+                }
+            )
 
     # Convert messages from pipeline-internal (OpenAI-style) format to Anthropic format
     messages = _convert_messages_for_anthropic(messages)
@@ -168,17 +176,19 @@ def _call_via_anthropic_sdk(
         if block.type == "text":
             content_text += block.text
         elif block.type == "tool_use":
-            tool_calls.append({
-                "id": block.id,
-                "type": "function",
-                "function": {
-                    "name": block.name,
-                    "arguments": json.dumps(block.input),
-                },
-            })
+            tool_calls.append(
+                {
+                    "id": block.id,
+                    "type": "function",
+                    "function": {
+                        "name": block.name,
+                        "arguments": json.dumps(block.input),
+                    },
+                }
+            )
 
     stop_reason = final.stop_reason or "end_turn"
-    input_tokens  = final.usage.input_tokens
+    input_tokens = final.usage.input_tokens
     output_tokens = final.usage.output_tokens
 
     assistant_msg: Dict[str, Any] = {"role": "assistant", "content": content_text}
@@ -189,7 +199,10 @@ def _call_via_anthropic_sdk(
 
     logger.debug(
         "_call_via_anthropic_sdk: stop=%s tools=%d tokens=%s elapsed=%.2fs",
-        stop_reason, len(tool_calls), usage, elapsed,
+        stop_reason,
+        len(tool_calls),
+        usage,
+        elapsed,
     )
 
     return {"message": assistant_msg, "stop_reason": stop_reason, "usage": usage}
@@ -262,8 +275,12 @@ def call_model_openai(
         call_kwargs["tools"] = tools
         call_kwargs["tool_choice"] = "auto"
 
-    logger.debug("call_model_openai: model=%s messages=%d tools=%d",
-                 model, len(full_messages), len(tools or []))
+    logger.debug(
+        "call_model_openai: model=%s messages=%d tools=%d",
+        model,
+        len(full_messages),
+        len(tools or []),
+    )
 
     t0 = time.monotonic()
     response = client.chat.completions.create(**call_kwargs)
@@ -276,14 +293,16 @@ def call_model_openai(
     tool_calls = []
     if msg.tool_calls:
         for tc in msg.tool_calls:
-            tool_calls.append({
-                "id": tc.id,
-                "type": "function",
-                "function": {
-                    "name": tc.function.name,
-                    "arguments": tc.function.arguments,
-                },
-            })
+            tool_calls.append(
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments,
+                    },
+                }
+            )
 
     assistant_msg = {
         "role": "assistant",
@@ -305,7 +324,10 @@ def call_model_openai(
 
     logger.debug(
         "call_model_openai: stop=%s tools_returned=%d tokens=%s elapsed=%.2fs",
-        stop_reason, len(tool_calls), usage, elapsed,
+        stop_reason,
+        len(tool_calls),
+        usage,
+        elapsed,
     )
 
     return {
@@ -319,9 +341,11 @@ def call_model_openai(
 # Jittered backoff
 # ---------------------------------------------------------------------------
 
+
 def jittered_backoff(attempt: int, base: float = 1.0, cap: float = 60.0) -> float:
     import random
-    delay = min(cap, base * (2 ** attempt))
+
+    delay = min(cap, base * (2**attempt))
     return delay * (0.5 + random.random() * 0.5)
 
 
@@ -339,8 +363,13 @@ def call_model_with_retry(
             retryable = any(x in msg for x in ("rate limit", "429", "502", "503", "timeout"))
             if retryable and attempt < max_attempts - 1:
                 delay = jittered_backoff(attempt)
-                logger.warning("Model call failed (%s); retry %d/%d in %.1fs",
-                               exc, attempt + 1, max_attempts, delay)
+                logger.warning(
+                    "Model call failed (%s); retry %d/%d in %.1fs",
+                    exc,
+                    attempt + 1,
+                    max_attempts,
+                    delay,
+                )
                 time.sleep(delay)
             else:
                 raise
@@ -350,6 +379,7 @@ def call_model_with_retry(
 # ---------------------------------------------------------------------------
 # Multi-provider failover
 # ---------------------------------------------------------------------------
+
 
 class ErrorCategory(str, Enum):
     RATE_LIMIT = "rate_limit"
@@ -367,9 +397,18 @@ def classify_api_error(exc: Exception) -> ErrorCategory:
 
     if code == 429 or "rate limit" in msg or "rate_limit" in msg or "429" in msg:
         return ErrorCategory.RATE_LIMIT
-    if code in (401, 403) or "unauthorized" in msg or "invalid api key" in msg or "forbidden" in msg:
+    if (
+        code in (401, 403)
+        or "unauthorized" in msg
+        or "invalid api key" in msg
+        or "forbidden" in msg
+    ):
         return ErrorCategory.AUTH_ERROR
-    if ("context" in msg and ("too long" in msg or "length" in msg)) or "token" in msg and "exceed" in msg:
+    if (
+        ("context" in msg and ("too long" in msg or "length" in msg))
+        or "token" in msg
+        and "exceed" in msg
+    ):
         return ErrorCategory.CONTEXT_TOO_LONG
     if "timeout" in msg or code == 408:
         return ErrorCategory.TIMEOUT
@@ -389,7 +428,7 @@ class CredentialPool:
         if not credentials:
             raise ValueError("CredentialPool requires at least one credential")
         self._creds = list(credentials)
-        self._unavailable: Dict[str, float] = {}   # api_key → unavailable_until timestamp
+        self._unavailable: Dict[str, float] = {}  # api_key → unavailable_until timestamp
         self._idx = 0
         self._lock = threading.Lock()
 
@@ -419,9 +458,11 @@ class CredentialPool:
         """Return the next available credential (round-robin, skipping unavailable)."""
         with self._lock:
             now = time.time()
-            available = [c for c in self._creds
-                         if c["api_key"] not in self._unavailable
-                         or self._unavailable[c["api_key"]] <= now]
+            available = [
+                c
+                for c in self._creds
+                if c["api_key"] not in self._unavailable or self._unavailable[c["api_key"]] <= now
+            ]
             if not available:
                 available = self._creds  # all rate-limited; caller will sleep
             self._idx = (self._idx + 1) % len(available)
@@ -433,7 +474,9 @@ class CredentialPool:
             self._unavailable[api_key] = time.time() + duration
         logger.warning(
             "Credential %s…%s marked unavailable for %.0fs",
-            api_key[:8], api_key[-4:] if len(api_key) > 8 else "", duration,
+            api_key[:8],
+            api_key[-4:] if len(api_key) > 8 else "",
+            duration,
         )
 
     @property
@@ -445,9 +488,9 @@ class CredentialPool:
         now = time.time()
         with self._lock:
             return sum(
-                1 for c in self._creds
-                if c["api_key"] not in self._unavailable
-                or self._unavailable[c["api_key"]] <= now
+                1
+                for c in self._creds
+                if c["api_key"] not in self._unavailable or self._unavailable[c["api_key"]] <= now
             )
 
 
@@ -501,7 +544,10 @@ def call_model_with_failover(
                 delay = jittered_backoff(attempt)
                 logger.warning(
                     "Transient error (%s) on attempt %d/%d; sleeping %.1fs",
-                    cat.value, attempt + 1, max_attempts, delay,
+                    cat.value,
+                    attempt + 1,
+                    max_attempts,
+                    delay,
                 )
                 time.sleep(delay)
 

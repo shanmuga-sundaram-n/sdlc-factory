@@ -32,6 +32,7 @@ def _setup_logging(verbose: bool = False) -> None:
 
 def _load_config(config_path: str) -> dict:
     import yaml
+
     if not Path(config_path).exists():
         return {}
     with open(config_path, encoding="utf-8") as f:
@@ -47,13 +48,13 @@ def _load_config(config_path: str) -> dict:
 # ---------------------------------------------------------------------------
 
 _PRICING: dict = {
-    "claude-opus-4-8":              (15.0,  75.0),
-    "claude-opus-4-7":              (15.0,  75.0),
-    "claude-sonnet-4-6":            ( 3.0,  15.0),
-    "claude-haiku-4-5":             ( 0.25,  1.25),
-    "claude-haiku-4-5-20251001":    ( 0.25,  1.25),
-    "gpt-4o":                       ( 2.5,  10.0),
-    "gpt-4o-mini":                  ( 0.15,  0.60),
+    "claude-opus-4-8": (15.0, 75.0),
+    "claude-opus-4-7": (15.0, 75.0),
+    "claude-sonnet-4-6": (3.0, 15.0),
+    "claude-haiku-4-5": (0.25, 1.25),
+    "claude-haiku-4-5-20251001": (0.25, 1.25),
+    "gpt-4o": (2.5, 10.0),
+    "gpt-4o-mini": (0.15, 0.60),
 }
 _DEFAULT_PRICING = (3.0, 15.0)
 
@@ -65,6 +66,7 @@ def _calc_cost(tokens_in: int, tokens_out: int, model: str) -> float:
 
 def _print_pipeline_plan(config: dict) -> None:
     from core.pipeline import SDLC_STAGES
+
     gov = config.get("governance", {})
     gate_cfgs = {g["stage"]: g for g in gov.get("hitl_gates", [])}
     default_mode = gov.get("default_mode", "cli")
@@ -119,14 +121,14 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     db = get_default_db(tenant_id=tenant)
     pipeline = SDLCPipeline.from_dict(config, db=db)
-    print(f"\nSDLC Factory — starting pipeline run")
+    print("\nSDLC Factory — starting pipeline run")
     print(f"Idea: {args.idea}\n")
 
     result = pipeline.run(args.idea)
 
     run_id = result.get("run_id", "")
     print(f"\n{'='*60}")
-    print(f"Pipeline run completed:")
+    print("Pipeline run completed:")
     print(f"  run_id : {run_id}")
     print(f"  status : {result.get('status')}")
     if result.get("paused_at"):
@@ -143,7 +145,6 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 def cmd_resume(args: argparse.Namespace) -> int:
     from core.pipeline import SDLCPipeline
-    from core.session import get_default_db
 
     config = _load_config(args.config) if args.config else {}
     pipeline = SDLCPipeline.from_dict(config)
@@ -223,11 +224,14 @@ def cmd_approve(args: argparse.Namespace) -> int:
     else:
         db.approve_artifact(args.run_id, args.stage, approved_by=actor)
 
-    db.log_decision(args.run_id, args.stage, decision.value, actor=actor, rationale=args.rationale or "")
+    db.log_decision(
+        args.run_id, args.stage, decision.value, actor=actor, rationale=args.rationale or ""
+    )
     print(f"Stage '{args.stage}' marked as {decision.value}")
 
     if args.resume:
         from core.pipeline import SDLCPipeline
+
         config = _load_config(args.config) if getattr(args, "config", None) else {}
         pipeline = SDLCPipeline.from_dict(config, db=db)
         result = pipeline.run("", resume_run_id=args.run_id)
@@ -298,7 +302,9 @@ def cmd_deliver(args: argparse.Namespace) -> int:
                     print("  Running smoke test ...")
                     run_result = _sp.run(
                         ["docker", "run", "--rm", release_tag, "--version"],
-                        capture_output=True, text=True, timeout=30,
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
                     )
                     status = "PASS" if run_result.returncode == 0 else "FAIL"
                     print(f"  Smoke test: {status}")
@@ -401,8 +407,7 @@ def cmd_ui(args: argparse.Namespace) -> int:
         import uvicorn
     except ImportError:
         print(
-            "Web UI requires the 'ui' extra. Install it with:\n"
-            "  uv sync --extra ui",
+            "Web UI requires the 'ui' extra. Install it with:\n" "  uv sync --extra ui",
             file=sys.stderr,
         )
         return 1
@@ -458,13 +463,15 @@ def cmd_list(args: argparse.Namespace) -> int:
 # Argument parser
 # ---------------------------------------------------------------------------
 
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="SDLC Factory — Autonomous AI software delivery pipeline"
     )
     parser.add_argument("--verbose", "-v", action="store_true")
     parser.add_argument(
-        "--tenant", default="default",
+        "--tenant",
+        default="default",
         help="Tenant ID — isolates DB records and loads ~/.sdlc-factory/tenants/<id>.env",
     )
     sub = parser.add_subparsers(dest="command")
@@ -475,10 +482,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--config", "-c", help="Path to sdlc_config.yaml")
     p_run.add_argument("--model", help="Override the default model")
     p_run.add_argument("--workspace", "-w", help="Override the output workspace directory")
-    p_run.add_argument("--auto-approve", action="store_true",
-                       help="Auto-approve all HITL gates (non-interactive)")
-    p_run.add_argument("--dry-run", action="store_true",
-                       help="Print the pipeline plan and exit without making API calls")
+    p_run.add_argument(
+        "--auto-approve", action="store_true", help="Auto-approve all HITL gates (non-interactive)"
+    )
+    p_run.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print the pipeline plan and exit without making API calls",
+    )
 
     # resume
     p_resume = sub.add_parser("resume", help="Resume a paused or failed run")
@@ -497,8 +508,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_approve = sub.add_parser("approve", help="Approve, reject, or amend a stage from the CLI")
     p_approve.add_argument("run_id")
     p_approve.add_argument("stage")
-    p_approve.add_argument("--decision", default="APPROVED",
-                           choices=["APPROVED", "REJECTED", "AMENDED"])
+    p_approve.add_argument(
+        "--decision", default="APPROVED", choices=["APPROVED", "REJECTED", "AMENDED"]
+    )
     p_approve.add_argument("--rationale", default="")
     p_approve.add_argument(
         "--amended-artifact",
@@ -507,19 +519,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="New artifact JSON string (required when --decision AMENDED)",
     )
     p_approve.add_argument(
-        "--resume", action="store_true",
+        "--resume",
+        action="store_true",
         help="Resume the pipeline immediately after approving",
     )
-    p_approve.add_argument("--config", "-c", default=None,
-                           help="Config file to use when --resume is set")
+    p_approve.add_argument(
+        "--config", "-c", default=None, help="Config file to use when --resume is set"
+    )
 
     # deliver
     p_deliver = sub.add_parser("deliver", help="Build Docker image and print deployment checklist")
     p_deliver.add_argument("run_id")
-    p_deliver.add_argument("--no-docker", action="store_true",
-                           help="Skip Docker build (print checklist only)")
-    p_deliver.add_argument("--smoke-test", action="store_true",
-                           help="Run a quick smoke test after the Docker build")
+    p_deliver.add_argument(
+        "--no-docker", action="store_true", help="Skip Docker build (print checklist only)"
+    )
+    p_deliver.add_argument(
+        "--smoke-test", action="store_true", help="Run a quick smoke test after the Docker build"
+    )
 
     # cost
     p_cost = sub.add_parser("cost", help="Show per-stage token usage and estimated cost")

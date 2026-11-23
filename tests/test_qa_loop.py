@@ -10,20 +10,17 @@ from __future__ import annotations
 
 import json
 import textwrap
-import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any, Dict
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
-import pytest
 
 from core.qa_loop import QALoop, _unwrap, _rewrap
 from core.session import PipelineDB
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_db(tmp_path: Path) -> PipelineDB:
     db = PipelineDB(tmp_path / "test.db")
@@ -35,6 +32,7 @@ def _make_pr(tmp_path: Path, db: PipelineDB):
     """Minimal PipelineRun-like object sufficient for QALoop."""
     from core.memory import ArtifactBundle, ProjectMemory
     from core.pipeline import PipelineRun
+
     ws = tmp_path / "workspace"
     ws.mkdir(parents=True, exist_ok=True)
     return PipelineRun(
@@ -50,6 +48,7 @@ def _make_pr(tmp_path: Path, db: PipelineDB):
 
 def _make_stage_def(name: str = "quality_gate"):
     from core.pipeline import StageDefinition
+
     return StageDefinition(name=name, agent_roles=["qa_engineer"])
 
 
@@ -67,6 +66,7 @@ def _qa_loop(db: PipelineDB, mock_build_cfg=None) -> QALoop:
 # ---------------------------------------------------------------------------
 # Helpers module-level functions
 # ---------------------------------------------------------------------------
+
 
 class TestInternalHelpers:
     def test_unwrap_single_role_dict(self):
@@ -95,6 +95,7 @@ class TestInternalHelpers:
 # pytest_tool — JUnit XML parsing
 # ---------------------------------------------------------------------------
 
+
 class TestJUnitXMLParsing:
     """Tests for the private _parse_junit_xml function."""
 
@@ -104,14 +105,18 @@ class TestJUnitXMLParsing:
 
     def test_parses_all_passing(self, tmp_path):
         from tools.pytest_tool import _parse_junit_xml
-        xml_path = self._write_xml(tmp_path / "r.xml", """\
+
+        xml_path = self._write_xml(
+            tmp_path / "r.xml",
+            """\
             <?xml version="1.0"?>
             <testsuite tests="3" failures="0" errors="0" skipped="0">
               <testcase classname="tests.test_foo" name="test_a"/>
               <testcase classname="tests.test_foo" name="test_b"/>
               <testcase classname="tests.test_foo" name="test_c"/>
             </testsuite>
-        """)
+        """,
+        )
         result = _parse_junit_xml(xml_path)
         assert result["passed"] == 3
         assert result["failed"] == 0
@@ -119,7 +124,10 @@ class TestJUnitXMLParsing:
 
     def test_parses_failures(self, tmp_path):
         from tools.pytest_tool import _parse_junit_xml
-        xml_path = self._write_xml(tmp_path / "r.xml", """\
+
+        xml_path = self._write_xml(
+            tmp_path / "r.xml",
+            """\
             <?xml version="1.0"?>
             <testsuite tests="2" failures="1" errors="0" skipped="0">
               <testcase classname="tests.test_foo" name="test_ok"/>
@@ -127,7 +135,8 @@ class TestJUnitXMLParsing:
                 <failure message="assert 1 == 2">AssertionError: assert 1 == 2</failure>
               </testcase>
             </testsuite>
-        """)
+        """,
+        )
         result = _parse_junit_xml(xml_path)
         assert result["failed"] == 1
         assert result["passed"] == 1
@@ -136,21 +145,28 @@ class TestJUnitXMLParsing:
 
     def test_parses_errors(self, tmp_path):
         from tools.pytest_tool import _parse_junit_xml
-        xml_path = self._write_xml(tmp_path / "r.xml", """\
+
+        xml_path = self._write_xml(
+            tmp_path / "r.xml",
+            """\
             <?xml version="1.0"?>
             <testsuite tests="1" failures="0" errors="1" skipped="0">
               <testcase classname="tests.test_foo" name="test_err">
                 <error>ImportError: no module named x</error>
               </testcase>
             </testsuite>
-        """)
+        """,
+        )
         result = _parse_junit_xml(xml_path)
         assert result["errors"] == 1
         assert result["failures"][0]["kind"] == "error"
 
     def test_handles_testsuites_wrapper(self, tmp_path):
         from tools.pytest_tool import _parse_junit_xml
-        xml_path = self._write_xml(tmp_path / "r.xml", """\
+
+        xml_path = self._write_xml(
+            tmp_path / "r.xml",
+            """\
             <?xml version="1.0"?>
             <testsuites>
               <testsuite tests="2" failures="0" errors="0" skipped="0">
@@ -158,18 +174,21 @@ class TestJUnitXMLParsing:
                 <testcase classname="a" name="t2"/>
               </testsuite>
             </testsuites>
-        """)
+        """,
+        )
         result = _parse_junit_xml(xml_path)
         assert result["passed"] == 2
 
     def test_returns_zeros_for_missing_file(self, tmp_path):
         from tools.pytest_tool import _parse_junit_xml
+
         result = _parse_junit_xml(tmp_path / "nonexistent.xml")
         assert result["passed"] == 0
         assert result["failures"] == []
 
     def test_returns_parse_error_on_malformed_xml(self, tmp_path):
         from tools.pytest_tool import _parse_junit_xml
+
         p = tmp_path / "bad.xml"
         p.write_text("not xml <><>", encoding="utf-8")
         result = _parse_junit_xml(p)
@@ -180,19 +199,23 @@ class TestJUnitXMLParsing:
 # pytest_tool — coverage JSON parsing
 # ---------------------------------------------------------------------------
 
+
 class TestCoverageJSONParsing:
     def test_parses_coverage_pct(self, tmp_path):
         from tools.pytest_tool import _parse_coverage_json
+
         p = tmp_path / "cov.json"
         p.write_text(json.dumps({"totals": {"percent_covered": 87.5}}), encoding="utf-8")
         assert _parse_coverage_json(p) == 87.5
 
     def test_returns_zero_for_missing_file(self, tmp_path):
         from tools.pytest_tool import _parse_coverage_json
+
         assert _parse_coverage_json(tmp_path / "missing.json") == 0.0
 
     def test_returns_zero_on_malformed_json(self, tmp_path):
         from tools.pytest_tool import _parse_coverage_json
+
         p = tmp_path / "bad.json"
         p.write_text("not json", encoding="utf-8")
         assert _parse_coverage_json(p) == 0.0
@@ -201,6 +224,7 @@ class TestCoverageJSONParsing:
 # ---------------------------------------------------------------------------
 # pytest_tool — run_pytest integration (mocked subprocess)
 # ---------------------------------------------------------------------------
+
 
 class TestRunPytestTool:
     def _make_xml(self, tmp_path: Path, passed: int = 2, failed: int = 0) -> str:
@@ -248,7 +272,9 @@ class TestRunPytestTool:
         import subprocess
 
         set_tool_context(workspace=tmp_path)
-        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="pytest", timeout=1)):
+        with patch(
+            "subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="pytest", timeout=1)
+        ):
             result = json.loads(run_pytest(timeout=1))
         assert "error" in result
         assert "timed out" in result["error"]
@@ -268,6 +294,7 @@ class TestRunPytestTool:
 # ---------------------------------------------------------------------------
 # QALoop — pass on first attempt
 # ---------------------------------------------------------------------------
+
 
 class TestQALoopPassFirstAttempt:
     def test_returns_immediately_when_gate_passed(self, tmp_path):
@@ -293,7 +320,8 @@ class TestQALoopPassFirstAttempt:
         loop = _qa_loop(db)
         artifact = {
             "qa_engineer": {
-                "gate_passed": False, "coverage_pct": 60,
+                "gate_passed": False,
+                "coverage_pct": 60,
                 "bugs": [{"id": "BUG-1", "title": "cosmetic", "severity": "minor"}],
             }
         }
@@ -306,27 +334,49 @@ class TestQALoopPassFirstAttempt:
 # QALoop — fix iteration dispatch
 # ---------------------------------------------------------------------------
 
+
 class TestQALoopFixIterations:
     def _make_loop_with_mocks(self, tmp_path, db, fix_succeeds=True, qa_passes_after=1):
         """Build a QALoop whose inner agents are fully mocked."""
         fix_agent_mock = MagicMock()
-        fix_agent_mock.run.return_value = MagicMock(success=fix_succeeds, error=None, artifact={"files_written": [], "tests_passing": fix_succeeds})
+        fix_agent_mock.run.return_value = MagicMock(
+            success=fix_succeeds,
+            error=None,
+            artifact={"files_written": [], "tests_passing": fix_succeeds},
+        )
 
-        qa_pass_artifact = {"gate_passed": True, "coverage_pct": 90, "bugs": [], "failing_tests": []}
+        qa_pass_artifact = {
+            "gate_passed": True,
+            "coverage_pct": 90,
+            "bugs": [],
+            "failing_tests": [],
+        }
         qa_fail_artifact = {
-            "gate_passed": False, "coverage_pct": 40,
-            "bugs": [{"id": "BUG-1", "title": "t fails", "severity": "critical",
-                      "related_task": "task-1", "steps_to_reproduce": "run test_x"}],
+            "gate_passed": False,
+            "coverage_pct": 40,
+            "bugs": [
+                {
+                    "id": "BUG-1",
+                    "title": "t fails",
+                    "severity": "critical",
+                    "related_task": "task-1",
+                    "steps_to_reproduce": "run test_x",
+                }
+            ],
             "failing_tests": [{"nodeid": "tests/test_foo.py::test_x", "message": "AssertionError"}],
         }
 
         rerun_call_count = {"n": 0}
 
         qa_agent_mock = MagicMock()
+
         def qa_run_side_effect(**kwargs):
             rerun_call_count["n"] += 1
-            artifact = qa_pass_artifact if rerun_call_count["n"] >= qa_passes_after else qa_fail_artifact
+            artifact = (
+                qa_pass_artifact if rerun_call_count["n"] >= qa_passes_after else qa_fail_artifact
+            )
             return MagicMock(success=True, error=None, artifact=artifact)
+
         qa_agent_mock.run.side_effect = qa_run_side_effect
 
         registry = {
@@ -352,13 +402,23 @@ class TestQALoopFixIterations:
     def test_creates_fix_kanban_task_on_critical_bug(self, tmp_path):
         db = _make_db(tmp_path)
         pr = _make_pr(tmp_path, db)
-        loop, _, _, _ = self._make_loop_with_mocks(tmp_path, db, fix_succeeds=True, qa_passes_after=1)
+        loop, _, _, _ = self._make_loop_with_mocks(
+            tmp_path, db, fix_succeeds=True, qa_passes_after=1
+        )
 
         initial = {
             "qa_engineer": {
-                "gate_passed": False, "coverage_pct": 40,
-                "bugs": [{"id": "BUG-1", "title": "test_x fails", "severity": "critical",
-                          "related_task": "task-1", "steps_to_reproduce": "run test_x"}],
+                "gate_passed": False,
+                "coverage_pct": 40,
+                "bugs": [
+                    {
+                        "id": "BUG-1",
+                        "title": "test_x fails",
+                        "severity": "critical",
+                        "related_task": "task-1",
+                        "steps_to_reproduce": "run test_x",
+                    }
+                ],
                 "failing_tests": [],
             }
         }
@@ -371,13 +431,23 @@ class TestQALoopFixIterations:
     def test_passes_after_single_fix(self, tmp_path):
         db = _make_db(tmp_path)
         pr = _make_pr(tmp_path, db)
-        loop, _, _, _ = self._make_loop_with_mocks(tmp_path, db, fix_succeeds=True, qa_passes_after=1)
+        loop, _, _, _ = self._make_loop_with_mocks(
+            tmp_path, db, fix_succeeds=True, qa_passes_after=1
+        )
 
         initial = {
             "qa_engineer": {
-                "gate_passed": False, "coverage_pct": 40,
-                "bugs": [{"id": "BUG-1", "title": "fails", "severity": "critical",
-                          "related_task": "t-1", "steps_to_reproduce": ""}],
+                "gate_passed": False,
+                "coverage_pct": 40,
+                "bugs": [
+                    {
+                        "id": "BUG-1",
+                        "title": "fails",
+                        "severity": "critical",
+                        "related_task": "t-1",
+                        "steps_to_reproduce": "",
+                    }
+                ],
                 "failing_tests": [],
             }
         }
@@ -387,13 +457,23 @@ class TestQALoopFixIterations:
     def test_fix_task_marked_done_on_success(self, tmp_path):
         db = _make_db(tmp_path)
         pr = _make_pr(tmp_path, db)
-        loop, _, _, _ = self._make_loop_with_mocks(tmp_path, db, fix_succeeds=True, qa_passes_after=1)
+        loop, _, _, _ = self._make_loop_with_mocks(
+            tmp_path, db, fix_succeeds=True, qa_passes_after=1
+        )
 
         initial = {
             "qa_engineer": {
-                "gate_passed": False, "coverage_pct": 40,
-                "bugs": [{"id": "BUG-1", "title": "x", "severity": "critical",
-                          "related_task": "t-1", "steps_to_reproduce": ""}],
+                "gate_passed": False,
+                "coverage_pct": 40,
+                "bugs": [
+                    {
+                        "id": "BUG-1",
+                        "title": "x",
+                        "severity": "critical",
+                        "related_task": "t-1",
+                        "steps_to_reproduce": "",
+                    }
+                ],
                 "failing_tests": [],
             }
         }
@@ -405,13 +485,23 @@ class TestQALoopFixIterations:
     def test_fix_task_marked_blocked_on_failure(self, tmp_path):
         db = _make_db(tmp_path)
         pr = _make_pr(tmp_path, db)
-        loop, _, _, _ = self._make_loop_with_mocks(tmp_path, db, fix_succeeds=False, qa_passes_after=99)
+        loop, _, _, _ = self._make_loop_with_mocks(
+            tmp_path, db, fix_succeeds=False, qa_passes_after=99
+        )
 
         initial = {
             "qa_engineer": {
-                "gate_passed": False, "coverage_pct": 40,
-                "bugs": [{"id": "BUG-1", "title": "x", "severity": "critical",
-                          "related_task": "t-1", "steps_to_reproduce": ""}],
+                "gate_passed": False,
+                "coverage_pct": 40,
+                "bugs": [
+                    {
+                        "id": "BUG-1",
+                        "title": "x",
+                        "severity": "critical",
+                        "related_task": "t-1",
+                        "steps_to_reproduce": "",
+                    }
+                ],
                 "failing_tests": [],
             }
         }
@@ -424,6 +514,7 @@ class TestQALoopFixIterations:
 # ---------------------------------------------------------------------------
 # QALoop — role resolution
 # ---------------------------------------------------------------------------
+
 
 class TestQALoopRoleResolution:
     def test_resolves_role_from_original_task(self, tmp_path):
@@ -448,6 +539,7 @@ class TestQALoopRoleResolution:
 # QALoop — escalation
 # ---------------------------------------------------------------------------
 
+
 class TestQALoopEscalation:
     def _exhausting_loop(self, tmp_path, db) -> QALoop:
         """Loop whose fix agent always fails, causing escalation."""
@@ -458,11 +550,19 @@ class TestQALoopEscalation:
         qa_agent.run.return_value = MagicMock(
             success=True,
             artifact={
-                "gate_passed": False, "coverage_pct": 20,
-                "bugs": [{"id": "BUG-1", "title": "x", "severity": "critical",
-                          "related_task": "t-1", "steps_to_reproduce": ""}],
+                "gate_passed": False,
+                "coverage_pct": 20,
+                "bugs": [
+                    {
+                        "id": "BUG-1",
+                        "title": "x",
+                        "severity": "critical",
+                        "related_task": "t-1",
+                        "steps_to_reproduce": "",
+                    }
+                ],
                 "failing_tests": [],
-            }
+            },
         )
         registry = {
             "developer_backend": MagicMock(return_value=fix_agent),
@@ -483,9 +583,17 @@ class TestQALoopEscalation:
 
         initial = {
             "qa_engineer": {
-                "gate_passed": False, "coverage_pct": 20,
-                "bugs": [{"id": "BUG-1", "title": "x", "severity": "critical",
-                          "related_task": "t-1", "steps_to_reproduce": ""}],
+                "gate_passed": False,
+                "coverage_pct": 20,
+                "bugs": [
+                    {
+                        "id": "BUG-1",
+                        "title": "x",
+                        "severity": "critical",
+                        "related_task": "t-1",
+                        "steps_to_reproduce": "",
+                    }
+                ],
                 "failing_tests": [],
             }
         }
@@ -499,9 +607,17 @@ class TestQALoopEscalation:
         loop = self._exhausting_loop(tmp_path, db)
         initial = {
             "qa_engineer": {
-                "gate_passed": False, "coverage_pct": 20,
-                "bugs": [{"id": "BUG-1", "title": "x", "severity": "critical",
-                          "related_task": "t-1", "steps_to_reproduce": ""}],
+                "gate_passed": False,
+                "coverage_pct": 20,
+                "bugs": [
+                    {
+                        "id": "BUG-1",
+                        "title": "x",
+                        "severity": "critical",
+                        "related_task": "t-1",
+                        "steps_to_reproduce": "",
+                    }
+                ],
                 "failing_tests": [],
             }
         }
@@ -515,9 +631,17 @@ class TestQALoopEscalation:
         loop = self._exhausting_loop(tmp_path, db)
         initial = {
             "qa_engineer": {
-                "gate_passed": False, "coverage_pct": 20,
-                "bugs": [{"id": "BUG-1", "title": "x", "severity": "critical",
-                          "related_task": "t-1", "steps_to_reproduce": ""}],
+                "gate_passed": False,
+                "coverage_pct": 20,
+                "bugs": [
+                    {
+                        "id": "BUG-1",
+                        "title": "x",
+                        "severity": "critical",
+                        "related_task": "t-1",
+                        "steps_to_reproduce": "",
+                    }
+                ],
                 "failing_tests": [],
             }
         }
@@ -530,6 +654,7 @@ class TestQALoopEscalation:
 # Pipeline integration — _run_qa_loop hook
 # ---------------------------------------------------------------------------
 
+
 class TestPipelineQALoopHook:
     """Verify pipeline._execute() calls _run_qa_loop at quality_gate."""
 
@@ -540,20 +665,36 @@ class TestPipelineQALoopHook:
                 role_name = line.replace("# Role:", "").strip()
                 break
         artifacts = {
-            "Domain Expert":     {"domain": "test", "market_size": "s", "competitors": []},
-            "Product Owner":     {"user_stories": [], "mvp_stories": [], "mvp_rationale": ""},
-            "Business Analyst":  {"functional_requirements": [], "non_functional_requirements": [],
-                                  "data_dictionary": [], "open_questions": [], "assumptions": []},
-            "Architect":         {"adrs": [], "tech_stack": {}, "c4_context": "", "c4_container": ""},
-            "Tech Lead":         {"tasks": [], "coding_standards": {}},
+            "Domain Expert": {"domain": "test", "market_size": "s", "competitors": []},
+            "Product Owner": {"user_stories": [], "mvp_stories": [], "mvp_rationale": ""},
+            "Business Analyst": {
+                "functional_requirements": [],
+                "non_functional_requirements": [],
+                "data_dictionary": [],
+                "open_questions": [],
+                "assumptions": [],
+            },
+            "Architect": {"adrs": [], "tech_stack": {}, "c4_context": "", "c4_container": ""},
+            "Tech Lead": {"tasks": [], "coding_standards": {}},
             "Backend Developer": {"files_written": [], "tests_passing": True},
-            "UI Developer":      {"files_written": [], "tests_passing": True},
-            "DevOps Engineer":   {"files_written": [], "ci_steps": [], "secrets_required": [],
-                                  "deployment_notes": ""},
-            "QA Engineer":       {"coverage_pct": 90, "gate_passed": True, "bugs": [],
-                                  "failing_tests": []},
-            "Release Manager":   {"version": "1.0.0", "release_notes": "ok",
-                                  "deployment_checklist": []},
+            "UI Developer": {"files_written": [], "tests_passing": True},
+            "DevOps Engineer": {
+                "files_written": [],
+                "ci_steps": [],
+                "secrets_required": [],
+                "deployment_notes": "",
+            },
+            "QA Engineer": {
+                "coverage_pct": 90,
+                "gate_passed": True,
+                "bugs": [],
+                "failing_tests": [],
+            },
+            "Release Manager": {
+                "version": "1.0.0",
+                "release_notes": "ok",
+                "deployment_checklist": [],
+            },
         }
         artifact = artifacts.get(role_name, {"result": "ok"})
         content = f"```json\n{json.dumps(artifact)}\n```"
@@ -568,6 +709,7 @@ class TestPipelineQALoopHook:
         mock_model.side_effect = self._mock_call_model
         db = PipelineDB(tmp_path / "p.db")
         from core.pipeline import SDLCPipeline
+
         config = {
             "workspace": str(tmp_path / "output"),
             "governance": {"default_mode": "auto"},
@@ -575,7 +717,7 @@ class TestPipelineQALoopHook:
         pipeline = SDLCPipeline.from_dict(config, db=db)
 
         with patch.object(pipeline, "_run_qa_loop", wraps=pipeline._run_qa_loop) as spy:
-            result = pipeline.run("Build a test app")
+            pipeline.run("Build a test app")
 
         assert spy.called, "_run_qa_loop was never called"
         call_args = spy.call_args
@@ -589,6 +731,7 @@ class TestPipelineQALoopHook:
         mock_model.side_effect = self._mock_call_model
         db = PipelineDB(tmp_path / "p.db")
         from core.pipeline import SDLCPipeline
+
         config = {
             "workspace": str(tmp_path / "output"),
             "governance": {"default_mode": "auto"},
@@ -608,6 +751,7 @@ class TestPipelineQALoopHook:
         mock_model.side_effect = self._mock_call_model
         db = PipelineDB(tmp_path / "p.db")
         from core.pipeline import SDLCPipeline
+
         config = {
             "workspace": str(tmp_path / "output"),
             "governance": {"default_mode": "auto"},
@@ -618,8 +762,8 @@ class TestPipelineQALoopHook:
         captured = {}
 
         original_run_qa_loop = pipeline._run_qa_loop
+
         def capturing_run_qa_loop(pr, stage_def, initial):
-            from core.qa_loop import QALoop
             # Inspect what QALoop would get
             captured["max"] = config.get("qa", {}).get("max_fix_iterations", 3)
             return original_run_qa_loop(pr, stage_def, initial)

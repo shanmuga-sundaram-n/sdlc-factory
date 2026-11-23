@@ -16,8 +16,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Optional
-from urllib.parse import quote_plus
 
 from core.registry import registry, tool_error
 
@@ -51,18 +49,23 @@ def _search_brave(query: str, num_results: int, api_key: str) -> str:
 
     results = []
     for item in data.get("web", {}).get("results", [])[:num_results]:
-        results.append({
-            "title": item.get("title", ""),
-            "url": item.get("url", ""),
-            "snippet": (item.get("description") or "")[:_MAX_SNIPPET_CHARS],
-        })
+        results.append(
+            {
+                "title": item.get("title", ""),
+                "url": item.get("url", ""),
+                "snippet": (item.get("description") or "")[:_MAX_SNIPPET_CHARS],
+            }
+        )
 
-    return json.dumps({
-        "query": query,
-        "source": "brave",
-        "results": results,
-        "total_returned": len(results),
-    }, ensure_ascii=False)
+    return json.dumps(
+        {
+            "query": query,
+            "source": "brave",
+            "results": results,
+            "total_returned": len(results),
+        },
+        ensure_ascii=False,
+    )
 
 
 def _search_duckduckgo(query: str, num_results: int) -> str:
@@ -92,11 +95,13 @@ def _search_duckduckgo(query: str, num_results: int) -> str:
     abstract = data.get("AbstractText", "")
     abstract_url = data.get("AbstractURL", "")
     if abstract and abstract_url:
-        results.append({
-            "title": data.get("Heading", query),
-            "url": abstract_url,
-            "snippet": abstract[:_MAX_SNIPPET_CHARS],
-        })
+        results.append(
+            {
+                "title": data.get("Heading", query),
+                "url": abstract_url,
+                "snippet": abstract[:_MAX_SNIPPET_CHARS],
+            }
+        )
 
     # Related topics
     for topic in data.get("RelatedTopics", [])[:num_results]:
@@ -105,31 +110,38 @@ def _search_duckduckgo(query: str, num_results: int) -> str:
         text = topic.get("Text", "")
         url = topic.get("FirstURL", "")
         if text and url:
-            results.append({
-                "title": text[:80],
-                "url": url,
-                "snippet": text[:_MAX_SNIPPET_CHARS],
-            })
+            results.append(
+                {
+                    "title": text[:80],
+                    "url": url,
+                    "snippet": text[:_MAX_SNIPPET_CHARS],
+                }
+            )
         if len(results) >= num_results:
             break
 
     if not results:
-        return json.dumps({
+        return json.dumps(
+            {
+                "query": query,
+                "source": "duckduckgo",
+                "results": [],
+                "note": (
+                    "No results from DuckDuckGo instant answer API. "
+                    "Set BRAVE_SEARCH_API_KEY for full web search results."
+                ),
+            }
+        )
+
+    return json.dumps(
+        {
             "query": query,
             "source": "duckduckgo",
-            "results": [],
-            "note": (
-                "No results from DuckDuckGo instant answer API. "
-                "Set BRAVE_SEARCH_API_KEY for full web search results."
-            ),
-        })
-
-    return json.dumps({
-        "query": query,
-        "source": "duckduckgo",
-        "results": results[:num_results],
-        "total_returned": min(len(results), num_results),
-    }, ensure_ascii=False)
+            "results": results[:num_results],
+            "total_returned": min(len(results), num_results),
+        },
+        ensure_ascii=False,
+    )
 
 
 def _web_search(query: str, num_results: int = 5) -> str:
@@ -148,9 +160,7 @@ def _web_search(query: str, num_results: int = 5) -> str:
     if api_key:
         return _search_brave(query, num_results, api_key)
 
-    logger.debug(
-        "web_search: BRAVE_SEARCH_API_KEY not set; falling back to DuckDuckGo"
-    )
+    logger.debug("web_search: BRAVE_SEARCH_API_KEY not set; falling back to DuckDuckGo")
     return _search_duckduckgo(query, num_results)
 
 

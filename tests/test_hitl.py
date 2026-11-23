@@ -14,9 +14,7 @@ from __future__ import annotations
 
 import json
 import threading
-from pathlib import Path
-from typing import Any, Dict
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -30,10 +28,10 @@ from gateway.hitl import (
 )
 from core.session import PipelineDB
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def tmp_db(tmp_path):
@@ -54,10 +52,13 @@ def evaluator():
 # AutoEvaluator — quality_gate rule
 # ---------------------------------------------------------------------------
 
+
 class TestAutoEvaluatorQualityGate:
     def test_approved_when_coverage_meets_threshold(self, evaluator):
         artifact = {"coverage_pct": 85, "gate_passed": True}
-        decision, rationale = evaluator.evaluate("quality_gate", artifact, {"coverage_threshold": 80})
+        decision, rationale = evaluator.evaluate(
+            "quality_gate", artifact, {"coverage_threshold": 80}
+        )
         assert decision == Decision.APPROVED
         assert "85%" in rationale
 
@@ -98,6 +99,7 @@ class TestAutoEvaluatorQualityGate:
 # AutoEvaluator — open_questions rule
 # ---------------------------------------------------------------------------
 
+
 class TestAutoEvaluatorOpenQuestions:
     def test_rejected_when_open_questions_exceed_max(self, evaluator):
         artifact = {"open_questions": ["q1", "q2", "q3"]}
@@ -109,9 +111,7 @@ class TestAutoEvaluatorOpenQuestions:
 
     def test_approved_when_questions_within_limit(self, evaluator):
         artifact = {"open_questions": ["q1"]}
-        decision, _ = evaluator.evaluate(
-            "requirements", artifact, {"max_open_questions": 2}
-        )
+        decision, _ = evaluator.evaluate("requirements", artifact, {"max_open_questions": 2})
         assert decision == Decision.APPROVED
 
     def test_approved_when_no_open_questions(self, evaluator):
@@ -121,9 +121,7 @@ class TestAutoEvaluatorOpenQuestions:
 
     def test_unwraps_role_wrapped_artifact(self, evaluator):
         artifact = {"business_analyst": {"open_questions": ["q1", "q2"]}}
-        decision, _ = evaluator.evaluate(
-            "requirements", artifact, {"max_open_questions": 0}
-        )
+        decision, _ = evaluator.evaluate("requirements", artifact, {"max_open_questions": 0})
         assert decision == Decision.REJECTED
 
     def test_non_requirements_stage_skips_rule(self, evaluator):
@@ -135,6 +133,7 @@ class TestAutoEvaluatorOpenQuestions:
 # ---------------------------------------------------------------------------
 # HITLGateway — auto mode
 # ---------------------------------------------------------------------------
+
 
 class TestHITLGatewayAutoMode:
     def test_auto_approves_clean_quality_gate(self, gateway):
@@ -172,11 +171,14 @@ class TestHITLGatewayAutoMode:
 # HITLGateway — queue mode
 # ---------------------------------------------------------------------------
 
+
 class TestHITLGatewayQueueMode:
     def _resolve_async(self, gateway, request_id, decision, rationale, amended=None):
         """Helper: resolve an approval request from another thread after a short delay."""
+
         def _worker():
             import time
+
             time.sleep(0.05)
             gateway.approval_queue.resolve(
                 ApprovalResponse(
@@ -187,6 +189,7 @@ class TestHITLGatewayQueueMode:
                     amended_artifact=amended,
                 )
             )
+
         t = threading.Thread(target=_worker, daemon=True)
         t.start()
         return t
@@ -205,6 +208,7 @@ class TestHITLGatewayQueueMode:
 
         def _resolve():
             import time
+
             time.sleep(0.05)
             assert submitted, "No request submitted yet"
             gateway.approval_queue.resolve(
@@ -239,6 +243,7 @@ class TestHITLGatewayQueueMode:
 
         def _resolve():
             import time
+
             time.sleep(0.05)
             gateway.approval_queue.resolve(
                 ApprovalResponse(
@@ -271,6 +276,7 @@ class TestHITLGatewayQueueMode:
 
         def _resolve():
             import time
+
             time.sleep(0.05)
             gateway.approval_queue.resolve(
                 ApprovalResponse(
@@ -304,6 +310,7 @@ class TestHITLGatewayQueueMode:
 # HITLGateway — unknown mode
 # ---------------------------------------------------------------------------
 
+
 class TestHITLGatewayUnknownMode:
     def test_unknown_mode_auto_approves(self, gateway):
         artifact = {"x": 1}
@@ -317,6 +324,7 @@ class TestHITLGatewayUnknownMode:
 # ---------------------------------------------------------------------------
 # ApprovalQueue
 # ---------------------------------------------------------------------------
+
 
 class TestApprovalQueue:
     def test_submit_and_list_pending(self):
@@ -347,9 +355,17 @@ class TestApprovalQueue:
 # PipelineDB — clear_stages_after and update_artifact
 # ---------------------------------------------------------------------------
 
+
 class TestPipelineDBAmendedSupport:
-    STAGE_ORDER = ["discovery", "requirements", "architecture", "planning", "development",
-                   "quality_gate", "delivery"]
+    STAGE_ORDER = [
+        "discovery",
+        "requirements",
+        "architecture",
+        "planning",
+        "development",
+        "quality_gate",
+        "delivery",
+    ]
 
     def test_clear_stages_after_removes_downstream(self, tmp_db):
         db = tmp_db
@@ -390,9 +406,13 @@ class TestPipelineDBAmendedSupport:
         db.save_artifact("run-e", "requirements", {"v": 1})
         db.approve_artifact("run-e", "requirements", approved_by="operator")
         db.update_artifact("run-e", "requirements", {"v": 2})
-        row = db._conn().execute(
-            "SELECT status FROM stage_artifacts WHERE run_id='run-e' AND stage='requirements'"
-        ).fetchone()
+        row = (
+            db._conn()
+            .execute(
+                "SELECT status FROM stage_artifacts WHERE run_id='run-e' AND stage='requirements'"
+            )
+            .fetchone()
+        )
         assert row["status"] == "pending"
 
 
@@ -401,16 +421,21 @@ class TestPipelineDBAmendedSupport:
 # ---------------------------------------------------------------------------
 
 _ROLE_ARTIFACTS = {
-    "Domain Expert":       {"domain": "test", "market_size": "large", "competitors": []},
-    "Product Owner":       {"product_name": "TestApp", "vision": "v", "epics": [], "mvp_scope": []},
-    "Business Analyst":    {"requirements": [], "user_stories": [], "open_questions": [], "acceptance_criteria": []},
-    "Architect":           {"system_design": {}, "tech_stack": {}, "adrs": [], "risks": []},
-    "Tech Lead":           {"sprint_plan": [], "tasks": [], "risks": []},
-    "Developer Backend":   {"files_created": [], "summary": "done", "test_coverage": 80},
-    "Developer UI":        {"files_created": [], "summary": "done", "components": []},
-    "Developer DevOps":    {"files_created": [], "summary": "done", "pipeline_steps": []},
-    "QA Engineer":         {"test_plan": [], "coverage_pct": 90, "gate_passed": True, "issues": []},
-    "Release Manager":     {"release_notes": "", "version": "1.0.0", "deployment_steps": []},
+    "Domain Expert": {"domain": "test", "market_size": "large", "competitors": []},
+    "Product Owner": {"product_name": "TestApp", "vision": "v", "epics": [], "mvp_scope": []},
+    "Business Analyst": {
+        "requirements": [],
+        "user_stories": [],
+        "open_questions": [],
+        "acceptance_criteria": [],
+    },
+    "Architect": {"system_design": {}, "tech_stack": {}, "adrs": [], "risks": []},
+    "Tech Lead": {"sprint_plan": [], "tasks": [], "risks": []},
+    "Developer Backend": {"files_created": [], "summary": "done", "test_coverage": 80},
+    "Developer UI": {"files_created": [], "summary": "done", "components": []},
+    "Developer DevOps": {"files_created": [], "summary": "done", "pipeline_steps": []},
+    "QA Engineer": {"test_plan": [], "coverage_pct": 90, "gate_passed": True, "issues": []},
+    "Release Manager": {"release_notes": "", "version": "1.0.0", "deployment_steps": []},
 }
 
 
@@ -437,7 +462,7 @@ def auto_config(tmp_path):
             "default_mode": "auto",
             "hitl_gates": [
                 {"stage": "requirements", "mode": "auto", "max_open_questions": 0},
-                {"stage": "quality_gate",  "mode": "auto", "coverage_threshold": 80},
+                {"stage": "quality_gate", "mode": "auto", "coverage_threshold": 80},
             ],
         },
         "pipeline": {"model": "claude-sonnet-4-6"},
@@ -449,6 +474,7 @@ class TestPipelineHITLIntegration:
     def test_auto_gate_approves_clean_run(self, mock_model, auto_config, tmp_path):
         db = PipelineDB(tmp_path / "pipeline.db")
         from core.pipeline import SDLCPipeline
+
         pipeline = SDLCPipeline.from_dict(auto_config, db=db)
         result = pipeline.run("Build a test app")
         assert result["status"] == "completed"
@@ -461,7 +487,10 @@ class TestPipelineHITLIntegration:
         """Override qa_engineer artifact so coverage is below threshold."""
         failing_artifacts = dict(_ROLE_ARTIFACTS)
         failing_artifacts["QA Engineer"] = {
-            "test_plan": [], "coverage_pct": 50, "gate_passed": False, "issues": []
+            "test_plan": [],
+            "coverage_pct": 50,
+            "gate_passed": False,
+            "issues": [],
         }
 
         def _mock_failing(model, base_url, api_key, system, messages, tools, **kwargs):
@@ -480,6 +509,7 @@ class TestPipelineHITLIntegration:
 
         db = PipelineDB(tmp_path / "pipeline.db")
         from core.pipeline import SDLCPipeline
+
         with patch("core.agent_runtime.call_model_openai", side_effect=_mock_failing):
             pipeline = SDLCPipeline.from_dict(auto_config, db=db)
             result = pipeline.run("Build a test app")
@@ -514,6 +544,7 @@ class TestPipelineHITLIntegration:
 
         db = PipelineDB(tmp_path / "pipeline.db")
         from core.pipeline import SDLCPipeline
+
         with patch("core.agent_runtime.call_model_openai", side_effect=_mock_with_fail_then_pass):
             pipeline = SDLCPipeline.from_dict(auto_config, db=db)
             result = pipeline.run("Build a test app")
@@ -535,7 +566,7 @@ class TestPipelineHITLIntegration:
     def test_amended_clears_downstream_artifacts(self, mock_model, auto_config, tmp_path):
         """AMENDED decision at requirements should clear architecture and beyond."""
         db = PipelineDB(tmp_path / "pipeline.db")
-        from core.pipeline import SDLC_STAGES, SDLCPipeline
+        from core.pipeline import SDLCPipeline
         from gateway.hitl import ApprovalQueue, ApprovalResponse
 
         amended_artifact = {
@@ -551,7 +582,7 @@ class TestPipelineHITLIntegration:
             "default_mode": "auto",
             "hitl_gates": [
                 {"stage": "requirements", "mode": "queue"},
-                {"stage": "quality_gate",  "mode": "auto", "coverage_threshold": 80},
+                {"stage": "quality_gate", "mode": "auto", "coverage_threshold": 80},
             ],
         }
 
@@ -568,19 +599,22 @@ class TestPipelineHITLIntegration:
 
         def _resolve_amended():
             import time
+
             # Wait until requirements stage submits its request
             for _ in range(100):
                 if submitted_ids:
                     break
                 time.sleep(0.05)
             if submitted_ids:
-                aq.resolve(ApprovalResponse(
-                    request_id=submitted_ids[0],
-                    decision=Decision.AMENDED,
-                    actor="test",
-                    rationale="amended",
-                    amended_artifact={"business_analyst": amended_artifact},
-                ))
+                aq.resolve(
+                    ApprovalResponse(
+                        request_id=submitted_ids[0],
+                        decision=Decision.AMENDED,
+                        actor="test",
+                        rationale="amended",
+                        amended_artifact={"business_analyst": amended_artifact},
+                    )
+                )
 
         t = threading.Thread(target=_resolve_amended, daemon=True)
         t.start()

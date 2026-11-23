@@ -70,7 +70,9 @@ def docker_build(
     """
     workspace = get_workspace()
     context = safe_resolve(context_dir) if context_dir not in (".", "") else workspace
-    dockerfile_path = safe_resolve(dockerfile) if dockerfile != "Dockerfile" else workspace / "Dockerfile"
+    dockerfile_path = (
+        safe_resolve(dockerfile) if dockerfile != "Dockerfile" else workspace / "Dockerfile"
+    )
 
     cmd = ["build", "-t", tag, "-f", str(dockerfile_path)]
     if build_args:
@@ -92,14 +94,17 @@ def docker_build(
         if match2:
             image_id = "sha256:" + match2.group(1)[:12]
 
-    return json.dumps({
-        "success": success,
-        "tag": tag,
-        "image_id": image_id,
-        "return_code": result["returncode"],
-        "stdout": result["stdout"],
-        "stderr": result["stderr"],
-    }, ensure_ascii=False)
+    return json.dumps(
+        {
+            "success": success,
+            "tag": tag,
+            "image_id": image_id,
+            "return_code": result["returncode"],
+            "stdout": result["stdout"],
+            "stderr": result["stderr"],
+        },
+        ensure_ascii=False,
+    )
 
 
 def docker_run(
@@ -138,12 +143,15 @@ def docker_run(
         cmd += command.split()
 
     result = _run_docker(cmd, cwd=workspace, timeout=timeout)
-    return json.dumps({
-        "success": result["returncode"] == 0,
-        "exit_code": result["returncode"],
-        "stdout": result["stdout"],
-        "stderr": result["stderr"],
-    }, ensure_ascii=False)
+    return json.dumps(
+        {
+            "success": result["returncode"] == 0,
+            "exit_code": result["returncode"],
+            "stdout": result["stdout"],
+            "stderr": result["stderr"],
+        },
+        ensure_ascii=False,
+    )
 
 
 def docker_image_exists(tag: str) -> str:
@@ -153,10 +161,12 @@ def docker_image_exists(tag: str) -> str:
     """
     workspace = get_workspace()
     result = _run_docker(["image", "inspect", tag], cwd=workspace, timeout=15)
-    return json.dumps({
-        "exists": result["returncode"] == 0,
-        "tag": tag,
-    })
+    return json.dumps(
+        {
+            "exists": result["returncode"] == 0,
+            "tag": tag,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------

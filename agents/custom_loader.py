@@ -34,8 +34,6 @@ def load_custom_roles(
         logger.debug("Custom roles directory %s does not exist; skipping", target)
         return {}
 
-    from agents.custom_loader import _build_class  # self-import for testability
-
     loaded: Dict[str, Type] = {}
     for yaml_path in sorted(target.glob("*.yaml")):
         if yaml_path.name.endswith(".yaml.sample"):
@@ -55,6 +53,7 @@ def load_custom_roles(
 def _build_class_from_file(yaml_path: Path) -> Type:
     """Parse a YAML role definition and return a dynamic BaseSDLCAgent subclass."""
     import yaml
+
     with yaml_path.open(encoding="utf-8") as f:
         spec = yaml.safe_load(f)
     return _build_class(spec)
