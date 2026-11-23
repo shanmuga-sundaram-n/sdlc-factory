@@ -54,10 +54,17 @@ def invalidate_check_fn_cache() -> None:
 # ToolEntry
 # ---------------------------------------------------------------------------
 
+
 class ToolEntry:
     __slots__ = (
-        "name", "toolset", "schema", "handler",
-        "check_fn", "is_async", "description", "emoji",
+        "name",
+        "toolset",
+        "schema",
+        "handler",
+        "check_fn",
+        "is_async",
+        "description",
+        "emoji",
     )
 
     def __init__(
@@ -84,6 +91,7 @@ class ToolEntry:
 # ---------------------------------------------------------------------------
 # ToolRegistry — thread-safe, generation-tracked
 # ---------------------------------------------------------------------------
+
 
 class ToolRegistry:
     """Singleton registry that collects tool schemas + handlers from tool files.
@@ -175,14 +183,16 @@ class ToolRegistry:
                 continue
             if entry.check_fn is not None and not _check_fn_cached(entry.check_fn):
                 continue
-            result.append({
-                "type": "function",
-                "function": {
-                    "name": entry.name,
-                    "description": entry.description or entry.schema.get("description", ""),
-                    "parameters": entry.schema.get("parameters", {}),
-                },
-            })
+            result.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": entry.name,
+                        "description": entry.description or entry.schema.get("description", ""),
+                        "parameters": entry.schema.get("parameters", {}),
+                    },
+                }
+            )
         return result
 
     def handle(self, name: str, arguments: dict) -> Any:
@@ -212,6 +222,7 @@ registry = ToolRegistry()
 # Tool auto-discovery
 # ---------------------------------------------------------------------------
 
+
 def discover_tools(tools_dir: Optional[Path] = None) -> List[str]:
     """Import self-registering tool modules from tools_dir.
 
@@ -236,6 +247,8 @@ def discover_tools(tools_dir: Optional[Path] = None) -> List[str]:
 # Convenience: structured error return
 # ---------------------------------------------------------------------------
 
+
 def tool_error(message: str) -> str:
     import json
+
     return json.dumps({"error": message})

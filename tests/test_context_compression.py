@@ -20,8 +20,7 @@ from core.context_compressor import ContextCompressor
 
 def _make_messages(n: int, content_size: int = 100) -> List[Dict]:
     return [
-        {"role": "assistant" if i % 2 else "user", "content": "x" * content_size}
-        for i in range(n)
+        {"role": "assistant" if i % 2 else "user", "content": "x" * content_size} for i in range(n)
     ]
 
 
@@ -88,8 +87,7 @@ class TestMaybeCompress:
     def test_graceful_on_llm_failure(self):
         c = ContextCompressor(threshold_tokens=50, keep_recent=2)
         msgs = _make_messages(10, content_size=100)
-        with patch("core.agent_runtime.call_model_openai",
-                   side_effect=Exception("API error")):
+        with patch("core.agent_runtime.call_model_openai", side_effect=Exception("API error")):
             result = c.maybe_compress(msgs)
         # Falls back to original messages
         assert result == msgs
@@ -116,6 +114,7 @@ class TestMaybeCompress:
 class TestAgentConfigCompressor:
     def test_compressor_field_on_agent_config(self):
         from core.agent_base import AgentConfig
+
         c = ContextCompressor()
         cfg = AgentConfig(role="test", compressor=c)
         assert cfg.compressor is c
@@ -129,7 +128,7 @@ class TestAgentConfigCompressor:
         compressor.maybe_compress.side_effect = lambda msgs, system="": msgs
 
         cfg = AgentConfig(role="base", compressor=compressor)
-        pm = MagicMock()   # plain mock — no spec constraint
+        pm = MagicMock()  # plain mock — no spec constraint
         ab = ArtifactBundle("run-cmp")
         db = MagicMock()
 

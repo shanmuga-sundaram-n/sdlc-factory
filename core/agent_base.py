@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 # IterationBudget
 # ---------------------------------------------------------------------------
 
+
 class IterationBudget:
     """Thread-safe iteration counter.  consume() → True if budget remains."""
 
@@ -74,9 +75,11 @@ class IterationBudget:
 # AgentConfig
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class AgentConfig:
     """Runtime configuration for a single agent invocation."""
+
     role: str
     model: str = "claude-sonnet-4-6"
     base_url: Optional[str] = None
@@ -98,9 +101,11 @@ class AgentConfig:
 # AgentResult
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class AgentResult:
     """Structured result from a single agent run."""
+
     role: str
     run_id: str
     task_id: Optional[str]
@@ -118,11 +123,13 @@ class AgentResult:
 # BaseSDLCAgent
 # ---------------------------------------------------------------------------
 
-AGENT_BLOCKED_TOOLS_DEFAULT = frozenset({
-    "clarify",       # no user interaction in batch mode
-    "send_message",  # no side effects to external systems
-    "delegate_task", # subagents don't spawn sub-subagents
-})
+AGENT_BLOCKED_TOOLS_DEFAULT = frozenset(
+    {
+        "clarify",  # no user interaction in batch mode
+        "send_message",  # no side effects to external systems
+        "delegate_task",  # subagents don't spawn sub-subagents
+    }
+)
 
 
 class BaseSDLCAgent:
@@ -277,7 +284,12 @@ class BaseSDLCAgent:
 
         logger.info(
             "[%s] %s starting | run=%s stage=%s task=%s budget=%d",
-            self._agent_id, self.ROLE, run_id, stage, task_id, self.budget.max_total,
+            self._agent_id,
+            self.ROLE,
+            run_id,
+            stage,
+            task_id,
+            self.budget.max_total,
         )
 
         try:
@@ -308,7 +320,8 @@ class BaseSDLCAgent:
         if artifact is None:
             logger.warning(
                 "[%s] %s produced no parseable artifact — attempting recovery re-emit",
-                self._agent_id, self.ROLE,
+                self._agent_id,
+                self.ROLE,
             )
             try:
                 messages, tokens_in, tokens_out = self._recover_artifact(
@@ -326,29 +339,42 @@ class BaseSDLCAgent:
         if artifact is None:
             logger.error(
                 "[%s] %s produced no parseable artifact (including after recovery)",
-                self._agent_id, self.ROLE,
+                self._agent_id,
+                self.ROLE,
             )
             return AgentResult(
-                role=self.ROLE, run_id=run_id, task_id=task_id,
-                success=False, artifact=None,
+                role=self.ROLE,
+                run_id=run_id,
+                task_id=task_id,
+                success=False,
+                artifact=None,
                 error="No JSON artifact found in response",
                 iterations_used=self.budget.used,
-                tokens_in=tokens_in, tokens_out=tokens_out,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
                 duration_seconds=time.monotonic() - start,
                 raw_messages=messages,
             )
 
         logger.info(
             "[%s] %s completed | stage=%s iterations=%d tokens=%d+%d",
-            self._agent_id, self.ROLE, stage,
-            self.budget.used, tokens_in, tokens_out,
+            self._agent_id,
+            self.ROLE,
+            stage,
+            self.budget.used,
+            tokens_in,
+            tokens_out,
         )
 
         return AgentResult(
-            role=self.ROLE, run_id=run_id, task_id=task_id,
-            success=True, artifact=artifact,
+            role=self.ROLE,
+            run_id=run_id,
+            task_id=task_id,
+            success=True,
+            artifact=artifact,
             iterations_used=self.budget.used,
-            tokens_in=tokens_in, tokens_out=tokens_out,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
             duration_seconds=time.monotonic() - start,
             raw_messages=messages,
         )
@@ -377,9 +403,9 @@ class BaseSDLCAgent:
             api_key=self.config.api_key,
             system=system_prompt,
             messages=messages,
-            tools=[],   # no tools on recovery pass
+            tools=[],  # no tools on recovery pass
         )
-        tokens_in  += response.get("usage", {}).get("prompt_tokens", 0)
+        tokens_in += response.get("usage", {}).get("prompt_tokens", 0)
         tokens_out += response.get("usage", {}).get("completion_tokens", 0)
         messages = messages + [response.get("message", {})]
         return messages, tokens_in, tokens_out
@@ -418,7 +444,10 @@ class BaseSDLCAgent:
             if not self.budget.consume():
                 logger.warning(
                     "[%s] %s: iteration budget exhausted (%d/%d)",
-                    self._agent_id, self.ROLE, self.budget.used, self.budget.max_total,
+                    self._agent_id,
+                    self.ROLE,
+                    self.budget.used,
+                    self.budget.max_total,
                 )
                 break
 
@@ -462,6 +491,7 @@ class BaseSDLCAgent:
         # Inject per-agent runtime state so tool handlers can access workspace/DB
         try:
             from tools._context import set_tool_context
+
             set_tool_context(
                 workspace=self.config.workspace,
                 db=self.db,
@@ -491,11 +521,13 @@ class BaseSDLCAgent:
             if self.config.on_tool_complete:
                 self.config.on_tool_complete(tool_name, result)
 
-            results.append({
-                "tool_call_id": tc_id,
-                "role": "tool",
-                "content": result if isinstance(result, str) else json.dumps(result),
-            })
+            results.append(
+                {
+                    "tool_call_id": tc_id,
+                    "role": "tool",
+                    "content": result if isinstance(result, str) else json.dumps(result),
+                }
+            )
 
         return results
 
@@ -506,15 +538,14 @@ class BaseSDLCAgent:
     def _extract_artifact(self, messages: List[Dict]) -> Optional[Dict[str, Any]]:
         """Pull the last ```json ... ``` fence from the assistant's response."""
         import re
+
         for msg in reversed(messages):
             if msg.get("role") != "assistant":
                 continue
             content = msg.get("content") or ""
             if isinstance(content, list):
                 # Multi-part content (Anthropic style)
-                content = " ".join(
-                    p.get("text", "") for p in content if isinstance(p, dict)
-                )
+                content = " ".join(p.get("text", "") for p in content if isinstance(p, dict))
             # Find ```json ... ``` fence
             match = re.search(r"```json\s*([\s\S]*?)\s*```", content)
             if match:

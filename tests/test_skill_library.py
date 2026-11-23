@@ -18,7 +18,9 @@ def lib_dir(tmp_path: Path) -> Path:
     d = tmp_path / "skills" / "library"
     d.mkdir(parents=True)
     (d / "rest-api.md").write_text("# REST API\nUse nouns for resources.", encoding="utf-8")
-    (d / "event-driven.md").write_text("# Events\nImmutable records of what happened.", encoding="utf-8")
+    (d / "event-driven.md").write_text(
+        "# Events\nImmutable records of what happened.", encoding="utf-8"
+    )
     (d / "microservices.md").write_text("# Microservices\nOwn your data.", encoding="utf-8")
     return d
 
@@ -82,6 +84,7 @@ class TestSkillTools:
         sl_mod._default_library = lib
         try:
             from tools.skill_tools import _skill_list
+
             result = json.loads(_skill_list({}))
             assert "skills" in result
             names = {s["name"] for s in result["skills"]}
@@ -93,11 +96,11 @@ class TestSkillTools:
         import json
         import core.skill_library as sl_mod
 
-
         original = sl_mod._default_library
         sl_mod._default_library = lib
         try:
             from tools.skill_tools import _skill_view
+
             result = json.loads(_skill_view({"name": "rest-api"}))
             assert "content" in result
             assert "REST" in result["content"]
@@ -108,11 +111,11 @@ class TestSkillTools:
         import json
         import core.skill_library as sl_mod
 
-
         original = sl_mod._default_library
         sl_mod._default_library = lib
         try:
             from tools.skill_tools import _skill_view
+
             result = json.loads(_skill_view({"name": "nonexistent"}))
             assert "error" in result
             assert "available" in result
@@ -122,11 +125,13 @@ class TestSkillTools:
     def test_skill_view_tool_missing_name(self, lib):
         import json
         from tools.skill_tools import _skill_view
+
         result = json.loads(_skill_view({}))
         assert "error" in result
 
     def test_built_in_fragments_exist(self):
         from core.skill_library import _LIBRARY_DIR
+
         assert (_LIBRARY_DIR / "rest-api.md").exists()
         assert (_LIBRARY_DIR / "event-driven.md").exists()
         assert (_LIBRARY_DIR / "microservices.md").exists()
@@ -134,6 +139,7 @@ class TestSkillTools:
     def test_skill_tools_registered(self):
         from core.registry import registry
         import tools.skill_tools  # noqa
+
         defs = registry.get_definitions(enabled_toolsets=["skills"])
         names = {d["function"]["name"] for d in defs}
         assert "skill_list" in names

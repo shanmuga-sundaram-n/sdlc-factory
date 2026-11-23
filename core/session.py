@@ -130,7 +130,7 @@ def _retry(fn, max_attempts: int = 5, base_delay: float = 0.05):
             msg = str(exc).lower()
             if "locked" in msg or "busy" in msg:
                 if attempt < max_attempts - 1:
-                    delay = base_delay * (2 ** attempt) * (0.5 + random.random())
+                    delay = base_delay * (2**attempt) * (0.5 + random.random())
                     time.sleep(delay)
                     continue
             raise
@@ -174,9 +174,7 @@ class PipelineDB:
     def _init_db(self) -> None:
         conn = self._conn()
         conn.executescript(_CREATE_SCHEMA)
-        row = conn.execute(
-            "SELECT value FROM schema_meta WHERE key='version'"
-        ).fetchone()
+        row = conn.execute("SELECT value FROM schema_meta WHERE key='version'").fetchone()
         if row is None:
             conn.execute(
                 "INSERT INTO schema_meta VALUES ('version', ?)",
@@ -245,17 +243,25 @@ class PipelineDB:
             conn.commit()
 
     def get_run(self, run_id: str) -> Optional[Dict[str, Any]]:
-        row = self._conn().execute(
-            "SELECT * FROM pipeline_runs WHERE run_id=? AND tenant_id=?",
-            (run_id, self.tenant_id),
-        ).fetchone()
+        row = (
+            self._conn()
+            .execute(
+                "SELECT * FROM pipeline_runs WHERE run_id=? AND tenant_id=?",
+                (run_id, self.tenant_id),
+            )
+            .fetchone()
+        )
         return dict(row) if row else None
 
     def list_runs(self, limit: int = 20) -> List[Dict[str, Any]]:
-        rows = self._conn().execute(
-            "SELECT * FROM pipeline_runs WHERE tenant_id=? ORDER BY started_at DESC LIMIT ?",
-            (self.tenant_id, limit),
-        ).fetchall()
+        rows = (
+            self._conn()
+            .execute(
+                "SELECT * FROM pipeline_runs WHERE tenant_id=? ORDER BY started_at DESC LIMIT ?",
+                (self.tenant_id, limit),
+            )
+            .fetchall()
+        )
         return [dict(r) for r in rows]
 
     # ------------------------------------------------------------------
@@ -275,10 +281,14 @@ class PipelineDB:
         logger.info("Artifact saved: run=%s stage=%s", run_id, stage)
 
     def get_artifact(self, run_id: str, stage: str) -> Optional[Any]:
-        row = self._conn().execute(
-            "SELECT artifact_json FROM stage_artifacts WHERE run_id=? AND stage=?",
-            (run_id, stage),
-        ).fetchone()
+        row = (
+            self._conn()
+            .execute(
+                "SELECT artifact_json FROM stage_artifacts WHERE run_id=? AND stage=?",
+                (run_id, stage),
+            )
+            .fetchone()
+        )
         if row is None:
             return None
         return json.loads(row["artifact_json"])
@@ -293,11 +303,15 @@ class PipelineDB:
             self._conn().commit()
 
     def get_last_completed_stage(self, run_id: str) -> Optional[str]:
-        row = self._conn().execute(
-            "SELECT stage FROM stage_artifacts WHERE run_id=? AND status='approved' "
-            "ORDER BY id DESC LIMIT 1",
-            (run_id,),
-        ).fetchone()
+        row = (
+            self._conn()
+            .execute(
+                "SELECT stage FROM stage_artifacts WHERE run_id=? AND status='approved' "
+                "ORDER BY id DESC LIMIT 1",
+                (run_id,),
+            )
+            .fetchone()
+        )
         return row["stage"] if row else None
 
     def clear_stages_after(self, run_id: str, stage_name: str, stage_order: List[str]) -> List[str]:
@@ -311,7 +325,7 @@ class PipelineDB:
             idx = stage_order.index(stage_name)
         except ValueError:
             return []
-        downstream = stage_order[idx + 1:]
+        downstream = stage_order[idx + 1 :]
         if not downstream:
             return []
         with self._write_lock:
@@ -324,7 +338,10 @@ class PipelineDB:
             conn.commit()
         logger.info(
             "Cleared %d downstream stages after %s for run %s: %s",
-            len(downstream), stage_name, run_id, downstream,
+            len(downstream),
+            stage_name,
+            run_id,
+            downstream,
         )
         return downstream
 
@@ -362,9 +379,11 @@ class PipelineDB:
             self._conn().commit()
 
     def get_audit_log(self, run_id: str) -> List[Dict[str, Any]]:
-        rows = self._conn().execute(
-            "SELECT * FROM audit_log WHERE run_id=? ORDER BY id ASC", (run_id,)
-        ).fetchall()
+        rows = (
+            self._conn()
+            .execute("SELECT * FROM audit_log WHERE run_id=? ORDER BY id ASC", (run_id,))
+            .fetchall()
+        )
         return [dict(r) for r in rows]
 
     # ------------------------------------------------------------------
@@ -387,7 +406,12 @@ class PipelineDB:
                 "(task_id, run_id, title, assignee, status, priority, "
                 "depends_on, metadata_json, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
                 (
-                    task_id, run_id, title, assignee, "ready", priority,
+                    task_id,
+                    run_id,
+                    title,
+                    assignee,
+                    "ready",
+                    priority,
                     json.dumps(depends_on or []),
                     json.dumps(metadata or {}),
                     _now_iso(),
@@ -429,9 +453,11 @@ class PipelineDB:
             conn.commit()
 
     def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
-        row = self._conn().execute(
-            "SELECT * FROM kanban_tasks WHERE task_id=?", (task_id,)
-        ).fetchone()
+        row = (
+            self._conn()
+            .execute("SELECT * FROM kanban_tasks WHERE task_id=?", (task_id,))
+            .fetchone()
+        )
         if not row:
             return None
         d = dict(row)
@@ -442,15 +468,23 @@ class PipelineDB:
 
     def list_tasks(self, run_id: str, status: Optional[str] = None) -> List[Dict[str, Any]]:
         if status:
-            rows = self._conn().execute(
-                "SELECT * FROM kanban_tasks WHERE run_id=? AND status=? ORDER BY priority DESC",
-                (run_id, status),
-            ).fetchall()
+            rows = (
+                self._conn()
+                .execute(
+                    "SELECT * FROM kanban_tasks WHERE run_id=? AND status=? ORDER BY priority DESC",
+                    (run_id, status),
+                )
+                .fetchall()
+            )
         else:
-            rows = self._conn().execute(
-                "SELECT * FROM kanban_tasks WHERE run_id=? ORDER BY priority DESC",
-                (run_id,),
-            ).fetchall()
+            rows = (
+                self._conn()
+                .execute(
+                    "SELECT * FROM kanban_tasks WHERE run_id=? ORDER BY priority DESC",
+                    (run_id,),
+                )
+                .fetchall()
+            )
         result = []
         for row in rows:
             d = dict(row)
@@ -514,14 +548,18 @@ class PipelineDB:
 
     def get_token_summary(self, run_id: str) -> List[Dict[str, Any]]:
         """Return per-role token usage rows, ordered by stage then role."""
-        rows = self._conn().execute(
-            "SELECT stage, role, model, "
-            "SUM(tokens_in) AS tokens_in, SUM(tokens_out) AS tokens_out, "
-            "SUM(duration_seconds) AS duration_seconds "
-            "FROM token_usage WHERE run_id=? "
-            "GROUP BY stage, role, model ORDER BY recorded_at ASC",
-            (run_id,),
-        ).fetchall()
+        rows = (
+            self._conn()
+            .execute(
+                "SELECT stage, role, model, "
+                "SUM(tokens_in) AS tokens_in, SUM(tokens_out) AS tokens_out, "
+                "SUM(duration_seconds) AS duration_seconds "
+                "FROM token_usage WHERE run_id=? "
+                "GROUP BY stage, role, model ORDER BY recorded_at ASC",
+                (run_id,),
+            )
+            .fetchall()
+        )
         return [dict(r) for r in rows]
 
     # ------------------------------------------------------------------
@@ -530,19 +568,27 @@ class PipelineDB:
 
     def search_artifacts(self, query: str, run_id: Optional[str] = None) -> List[Dict]:
         if run_id:
-            rows = self._conn().execute(
-                "SELECT sa.run_id, sa.stage, sa.artifact_json "
-                "FROM artifact_fts fts JOIN stage_artifacts sa ON sa.rowid = fts.rowid "
-                "WHERE artifact_fts MATCH ? AND sa.run_id=?",
-                (query, run_id),
-            ).fetchall()
+            rows = (
+                self._conn()
+                .execute(
+                    "SELECT sa.run_id, sa.stage, sa.artifact_json "
+                    "FROM artifact_fts fts JOIN stage_artifacts sa ON sa.rowid = fts.rowid "
+                    "WHERE artifact_fts MATCH ? AND sa.run_id=?",
+                    (query, run_id),
+                )
+                .fetchall()
+            )
         else:
-            rows = self._conn().execute(
-                "SELECT sa.run_id, sa.stage, sa.artifact_json "
-                "FROM artifact_fts fts JOIN stage_artifacts sa ON sa.rowid = fts.rowid "
-                "WHERE artifact_fts MATCH ?",
-                (query,),
-            ).fetchall()
+            rows = (
+                self._conn()
+                .execute(
+                    "SELECT sa.run_id, sa.stage, sa.artifact_json "
+                    "FROM artifact_fts fts JOIN stage_artifacts sa ON sa.rowid = fts.rowid "
+                    "WHERE artifact_fts MATCH ?",
+                    (query,),
+                )
+                .fetchall()
+            )
         return [dict(r) for r in rows]
 
 

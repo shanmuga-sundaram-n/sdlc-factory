@@ -25,19 +25,21 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _set_ws(path: Path):
     from tools._context import set_tool_context
+
     set_tool_context(workspace=path, db=None, run_id="test-run")
 
 
 # ---------------------------------------------------------------------------
 # TestFileTools
 # ---------------------------------------------------------------------------
+
 
 class TestFileTools:
     def test_write_and_read(self, tmp_path):
@@ -160,6 +162,7 @@ class TestFileTools:
 # TestTerminalTool
 # ---------------------------------------------------------------------------
 
+
 class TestTerminalTool:
     def test_successful_command(self, tmp_path):
         _set_ws(tmp_path)
@@ -223,6 +226,7 @@ class TestTerminalTool:
 # TestKanbanTools
 # ---------------------------------------------------------------------------
 
+
 class TestKanbanTools:
     @pytest.fixture
     def db_and_ctx(self, tmp_path):
@@ -277,7 +281,9 @@ class TestKanbanTools:
         from tools.kanban_tools import _kanban_create
 
         _kanban_create(
-            "t-005", "Implement auth", "developer_backend",
+            "t-005",
+            "Implement auth",
+            "developer_backend",
             description="JWT auth endpoint",
             metadata={"skills": ["python", "jwt"], "sprint": 1},
         )
@@ -298,13 +304,18 @@ class TestKanbanTools:
 # TestWebTools
 # ---------------------------------------------------------------------------
 
+
 class TestWebTools:
     def test_brave_search_called_when_key_set(self, tmp_path):
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "web": {
                 "results": [
-                    {"title": "FastAPI Docs", "url": "https://fastapi.tiangolo.com", "description": "FastAPI framework"},
+                    {
+                        "title": "FastAPI Docs",
+                        "url": "https://fastapi.tiangolo.com",
+                        "description": "FastAPI framework",
+                    },
                 ]
             }
         }
@@ -313,6 +324,7 @@ class TestWebTools:
         with patch.dict(os.environ, {"BRAVE_SEARCH_API_KEY": "test-key"}):
             with patch("httpx.get", return_value=mock_response) as mock_get:
                 from tools.web_tools import _web_search
+
                 result = json.loads(_web_search("FastAPI tutorial", num_results=3))
 
         assert result["source"] == "brave"
@@ -335,6 +347,7 @@ class TestWebTools:
             with patch("httpx.get", return_value=mock_response):
                 from tools import web_tools  # ensure module is loaded
                 import importlib
+
                 importlib.reload(web_tools)
                 result = json.loads(web_tools._web_search("FastAPI"))
 
@@ -342,6 +355,7 @@ class TestWebTools:
 
     def test_empty_query_returns_error(self):
         from tools.web_tools import _web_search
+
         result = json.loads(_web_search(""))
         assert "error" in result
 
@@ -353,6 +367,7 @@ class TestWebTools:
         with patch.dict(os.environ, {"BRAVE_SEARCH_API_KEY": "k"}):
             with patch("httpx.get", return_value=mock_response) as mock_get:
                 from tools.web_tools import _web_search
+
                 _web_search("query", num_results=999)
                 _, kwargs = mock_get.call_args
                 params = kwargs.get("params", {})
@@ -362,6 +377,7 @@ class TestWebTools:
 # ---------------------------------------------------------------------------
 # TestToolDiscovery
 # ---------------------------------------------------------------------------
+
 
 class TestToolDiscovery:
     def test_discover_tools_imports_all_modules(self):
@@ -382,9 +398,18 @@ class TestToolDiscovery:
         SDLCPipeline.from_dict({"workspace": str(tmp_path / "out")}, db=db)
 
         # After pipeline init, these tools should be in the global registry
-        for tool_name in ("read_file", "write_file", "patch", "search_files",
-                          "terminal", "web_search",
-                          "kanban_create", "kanban_complete", "kanban_block", "kanban_comment"):
+        for tool_name in (
+            "read_file",
+            "write_file",
+            "patch",
+            "search_files",
+            "terminal",
+            "web_search",
+            "kanban_create",
+            "kanban_complete",
+            "kanban_block",
+            "kanban_comment",
+        ):
             entry = registry.get_entry(tool_name)
             assert entry is not None, f"Tool {tool_name!r} not registered after pipeline init"
 
@@ -413,6 +438,7 @@ class TestToolDiscovery:
 # ---------------------------------------------------------------------------
 # TestToolContextInjection
 # ---------------------------------------------------------------------------
+
 
 class TestToolContextInjection:
     def test_set_and_get_workspace(self, tmp_path):
@@ -467,6 +493,7 @@ class TestToolContextInjection:
 # TestGitWorkspace
 # ---------------------------------------------------------------------------
 
+
 class TestGitWorkspace:
     def test_git_init_creates_dotgit(self, tmp_path):
         from core.pipeline import SDLCPipeline
@@ -513,7 +540,9 @@ class TestGitWorkspace:
 
         log = subprocess.run(
             ["git", "log", "--oneline"],
-            cwd=str(run_ws), capture_output=True, text=True,
+            cwd=str(run_ws),
+            capture_output=True,
+            text=True,
         )
         assert "discovery" in log.stdout
 

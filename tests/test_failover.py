@@ -21,10 +21,10 @@ from core.agent_runtime import (
     call_model_with_failover,
 )
 
-
 # ---------------------------------------------------------------------------
 # classify_api_error
 # ---------------------------------------------------------------------------
+
 
 class TestClassifyApiError:
     def _exc(self, msg: str, status_code=None) -> Exception:
@@ -58,16 +58,24 @@ class TestClassifyApiError:
         assert classify_api_error(self._exc("timeout", 408)) == ErrorCategory.TIMEOUT
 
     def test_server_error_500(self):
-        assert classify_api_error(self._exc("internal server error", 500)) == ErrorCategory.SERVER_ERROR
+        assert (
+            classify_api_error(self._exc("internal server error", 500))
+            == ErrorCategory.SERVER_ERROR
+        )
 
     def test_server_error_502(self):
         assert classify_api_error(self._exc("bad gateway", 502)) == ErrorCategory.SERVER_ERROR
 
     def test_server_error_503(self):
-        assert classify_api_error(self._exc("service unavailable", 503)) == ErrorCategory.SERVER_ERROR
+        assert (
+            classify_api_error(self._exc("service unavailable", 503)) == ErrorCategory.SERVER_ERROR
+        )
 
     def test_context_too_long(self):
-        assert classify_api_error(self._exc("context length exceeded")) == ErrorCategory.CONTEXT_TOO_LONG
+        assert (
+            classify_api_error(self._exc("context length exceeded"))
+            == ErrorCategory.CONTEXT_TOO_LONG
+        )
 
     def test_unknown(self):
         assert classify_api_error(self._exc("some weird error")) == ErrorCategory.UNKNOWN
@@ -77,12 +85,10 @@ class TestClassifyApiError:
 # CredentialPool
 # ---------------------------------------------------------------------------
 
+
 class TestCredentialPool:
     def _pool(self, n: int = 3) -> CredentialPool:
-        return CredentialPool([
-            {"api_key": f"sk-key-{i}", "base_url": None}
-            for i in range(n)
-        ])
+        return CredentialPool([{"api_key": f"sk-key-{i}", "base_url": None} for i in range(n)])
 
     def test_single_entry_pool(self):
         pool = CredentialPool([{"api_key": "sk-only", "base_url": None}])
@@ -192,10 +198,12 @@ class TestCallModelWithFailover:
                 raise Exception("rate limit exceeded")
             return _SUCCESS_RESPONSE
 
-        pool = CredentialPool([
-            {"api_key": "sk-0", "base_url": None},
-            {"api_key": "sk-1", "base_url": None},
-        ])
+        pool = CredentialPool(
+            [
+                {"api_key": "sk-0", "base_url": None},
+                {"api_key": "sk-1", "base_url": None},
+            ]
+        )
         with patch("core.agent_runtime.call_model_openai", side_effect=_mock_call):
             result = call_model_with_failover(
                 credential_pool=pool, model="m", messages=[], max_attempts=3
@@ -234,8 +242,9 @@ class TestCallModelWithFailover:
 
     def test_exhausts_retries_and_raises(self):
         pool = CredentialPool([{"api_key": "sk-z", "base_url": None}])
-        with patch("core.agent_runtime.call_model_openai",
-                   side_effect=Exception("internal server error")):
+        with patch(
+            "core.agent_runtime.call_model_openai", side_effect=Exception("internal server error")
+        ):
             with patch("time.sleep"):
                 with pytest.raises(Exception, match="internal server error"):
                     call_model_with_failover(

@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _fmt(data: dict) -> str:
     return json.dumps(data, ensure_ascii=False)
 
@@ -33,6 +34,7 @@ def _fmt(data: dict) -> str:
 # ---------------------------------------------------------------------------
 # read_file
 # ---------------------------------------------------------------------------
+
 
 def _read_file(path: str, offset: int = 0, limit: Optional[int] = None) -> str:
     """Read a file from the workspace, returning its content.
@@ -59,16 +61,18 @@ def _read_file(path: str, offset: int = 0, limit: Optional[int] = None) -> str:
 
     lines = text.splitlines(keepends=True)
     total = len(lines)
-    window = lines[offset:] if limit is None else lines[offset:offset + limit]
+    window = lines[offset:] if limit is None else lines[offset : offset + limit]
     content = "".join(window)
 
-    return _fmt({
-        "path": path,
-        "content": content,
-        "total_lines": total,
-        "returned_lines": len(window),
-        "offset": offset,
-    })
+    return _fmt(
+        {
+            "path": path,
+            "content": content,
+            "total_lines": total,
+            "returned_lines": len(window),
+            "offset": offset,
+        }
+    )
 
 
 registry.register(
@@ -79,9 +83,13 @@ registry.register(
             "type": "object",
             "required": ["path"],
             "properties": {
-                "path":   {"type": "string", "description": "File path relative to workspace root"},
-                "offset": {"type": "integer", "description": "First line to return (0-based)", "default": 0},
-                "limit":  {"type": "integer", "description": "Max lines to return (omit for all)"},
+                "path": {"type": "string", "description": "File path relative to workspace root"},
+                "offset": {
+                    "type": "integer",
+                    "description": "First line to return (0-based)",
+                    "default": 0,
+                },
+                "limit": {"type": "integer", "description": "Max lines to return (omit for all)"},
             },
         }
     },
@@ -93,6 +101,7 @@ registry.register(
 # ---------------------------------------------------------------------------
 # write_file
 # ---------------------------------------------------------------------------
+
 
 def _write_file(path: str, content: str) -> str:
     """Write content to a file in the workspace, creating parent directories.
@@ -124,7 +133,7 @@ registry.register(
             "type": "object",
             "required": ["path", "content"],
             "properties": {
-                "path":    {"type": "string", "description": "File path relative to workspace root"},
+                "path": {"type": "string", "description": "File path relative to workspace root"},
                 "content": {"type": "string", "description": "Full file content to write"},
             },
         }
@@ -137,6 +146,7 @@ registry.register(
 # ---------------------------------------------------------------------------
 # patch
 # ---------------------------------------------------------------------------
+
 
 def _patch(path: str, old_string: str, new_string: str) -> str:
     """Replace the first occurrence of old_string with new_string in a file.
@@ -162,8 +172,7 @@ def _patch(path: str, old_string: str, new_string: str) -> str:
     count = original.count(old_string)
     if count == 0:
         return tool_error(
-            f"old_string not found in {path!r}. "
-            "Provide more context to make the match unique."
+            f"old_string not found in {path!r}. " "Provide more context to make the match unique."
         )
     if count > 1:
         return tool_error(
@@ -188,8 +197,11 @@ registry.register(
             "type": "object",
             "required": ["path", "old_string", "new_string"],
             "properties": {
-                "path":       {"type": "string", "description": "File path relative to workspace root"},
-                "old_string": {"type": "string", "description": "Exact string to replace (must be unique in file)"},
+                "path": {"type": "string", "description": "File path relative to workspace root"},
+                "old_string": {
+                    "type": "string",
+                    "description": "Exact string to replace (must be unique in file)",
+                },
                 "new_string": {"type": "string", "description": "Replacement string"},
             },
         }
@@ -202,6 +214,7 @@ registry.register(
 # ---------------------------------------------------------------------------
 # search_files
 # ---------------------------------------------------------------------------
+
 
 def _search_files(
     pattern: str,
@@ -246,14 +259,16 @@ def _search_files(
     except (OSError, re.error) as e:
         return tool_error(f"Search error: {e}")
 
-    return _fmt({
-        "pattern": pattern,
-        "directory": directory,
-        "grep": grep,
-        "matches": matches,
-        "total": len(matches),
-        "truncated": len(matches) >= max_results,
-    })
+    return _fmt(
+        {
+            "pattern": pattern,
+            "directory": directory,
+            "grep": grep,
+            "matches": matches,
+            "total": len(matches),
+            "truncated": len(matches) >= max_results,
+        }
+    )
 
 
 registry.register(
@@ -264,10 +279,24 @@ registry.register(
             "type": "object",
             "required": ["pattern"],
             "properties": {
-                "pattern":     {"type": "string", "description": "Glob pattern, e.g. '**/*.py' or 'src/*.ts'"},
-                "directory":   {"type": "string", "description": "Directory to search in (relative to workspace). Default: '.'", "default": "."},
-                "grep":        {"type": "string", "description": "Optional regex/string: only return files whose content matches"},
-                "max_results": {"type": "integer", "description": "Maximum results to return. Default 50", "default": 50},
+                "pattern": {
+                    "type": "string",
+                    "description": "Glob pattern, e.g. '**/*.py' or 'src/*.ts'",
+                },
+                "directory": {
+                    "type": "string",
+                    "description": "Directory to search in (relative to workspace). Default: '.'",
+                    "default": ".",
+                },
+                "grep": {
+                    "type": "string",
+                    "description": "Optional regex/string: only return files whose content matches",
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": "Maximum results to return. Default 50",
+                    "default": 50,
+                },
             },
         }
     },

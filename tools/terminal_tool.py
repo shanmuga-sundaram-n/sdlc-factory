@@ -84,14 +84,17 @@ def _terminal(command: str, cwd: Optional[str] = None, timeout: int = 60) -> str
         stdout = stdout[:half] + ("\n...[truncated]" if len(stdout) > half else "")
         stderr = stderr[:half] + ("\n...[truncated]" if len(stderr) > half else "")
 
-    return json.dumps({
-        "command": command,
-        "cwd": str(run_dir.relative_to(workspace)) if run_dir != workspace else ".",
-        "returncode": result.returncode,
-        "stdout": stdout,
-        "stderr": stderr,
-        "ok": result.returncode == 0,
-    }, ensure_ascii=False)
+    return json.dumps(
+        {
+            "command": command,
+            "cwd": str(run_dir.relative_to(workspace)) if run_dir != workspace else ".",
+            "returncode": result.returncode,
+            "stdout": stdout,
+            "stderr": stderr,
+            "ok": result.returncode == 0,
+        },
+        ensure_ascii=False,
+    )
 
 
 registry.register(

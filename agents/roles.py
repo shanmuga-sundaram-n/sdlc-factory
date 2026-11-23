@@ -17,7 +17,6 @@ from typing import Dict, List
 
 from core.agent_base import BaseSDLCAgent
 
-
 # ---------------------------------------------------------------------------
 # Shared toolset constants
 # ---------------------------------------------------------------------------
@@ -31,6 +30,7 @@ _KANBAN = ["kanban_create", "kanban_complete", "kanban_block", "kanban_comment"]
 # ---------------------------------------------------------------------------
 # Discovery stage
 # ---------------------------------------------------------------------------
+
 
 class DomainExpertAgent(BaseSDLCAgent):
     ROLE = "domain_expert"
@@ -114,6 +114,7 @@ class ProductOwnerAgent(BaseSDLCAgent):
 # Requirements stage
 # ---------------------------------------------------------------------------
 
+
 class BusinessAnalystAgent(BaseSDLCAgent):
     ROLE = "business_analyst"
     ROLE_DISPLAY = "Business Analyst"
@@ -169,6 +170,7 @@ class BusinessAnalystAgent(BaseSDLCAgent):
 # Architecture stage
 # ---------------------------------------------------------------------------
 
+
 class ArchitectAgent(BaseSDLCAgent):
     ROLE = "architect"
     ROLE_DISPLAY = "Architect"
@@ -215,6 +217,7 @@ class ArchitectAgent(BaseSDLCAgent):
 # Planning stage
 # ---------------------------------------------------------------------------
 
+
 class TechLeadAgent(BaseSDLCAgent):
     ROLE = "tech_lead"
     ROLE_DISPLAY = "Tech Lead"
@@ -234,7 +237,13 @@ class TechLeadAgent(BaseSDLCAgent):
                 "type": "array",
                 "items": {
                     "type": "object",
-                    "required": ["task_id", "title", "assignee_role", "description", "acceptance_criteria"],
+                    "required": [
+                        "task_id",
+                        "title",
+                        "assignee_role",
+                        "description",
+                        "acceptance_criteria",
+                    ],
                     "properties": {
                         "task_id": {"type": "string"},
                         "title": {"type": "string"},
@@ -262,8 +271,10 @@ class TechLeadAgent(BaseSDLCAgent):
 # Development stage — three parallel roles
 # ---------------------------------------------------------------------------
 
+
 class _DeveloperBase(BaseSDLCAgent):
     """Shared base for all developer roles."""
+
     ENABLED_TOOLSETS = _FULL
     MAX_ITERATIONS = 30
     OUTPUT_SCHEMA = {
@@ -302,8 +313,12 @@ class DeveloperUIAgent(_DeveloperBase):
         "keyboard-accessible and include ARIA labels. Write unit tests for logic "
         "and Playwright tests for critical user flows."
     )
-    ENABLED_TOOLSETS = _FULL + ["browser_navigate", "browser_snapshot", "browser_click",
-                                 "browser_type"]
+    ENABLED_TOOLSETS = _FULL + [
+        "browser_navigate",
+        "browser_snapshot",
+        "browser_click",
+        "browser_type",
+    ]
 
 
 class DeveloperDevOpsAgent(_DeveloperBase):
@@ -330,6 +345,7 @@ class DeveloperDevOpsAgent(_DeveloperBase):
 # ---------------------------------------------------------------------------
 # QA stage
 # ---------------------------------------------------------------------------
+
 
 class QAEngineerAgent(BaseSDLCAgent):
     ROLE = "qa_engineer"
@@ -373,7 +389,10 @@ class QAEngineerAgent(BaseSDLCAgent):
                     "properties": {
                         "id": {"type": "string"},
                         "title": {"type": "string"},
-                        "severity": {"type": "string", "enum": ["critical", "major", "minor", "trivial"]},
+                        "severity": {
+                            "type": "string",
+                            "enum": ["critical", "major", "minor", "trivial"],
+                        },
                         "steps_to_reproduce": {"type": "string"},
                         "related_task": {"type": "string"},
                     },
@@ -392,6 +411,7 @@ class QAEngineerAgent(BaseSDLCAgent):
 # ---------------------------------------------------------------------------
 # Delivery stage
 # ---------------------------------------------------------------------------
+
 
 class ReleaseManagerAgent(BaseSDLCAgent):
     ROLE = "release_manager"
@@ -417,8 +437,14 @@ class ReleaseManagerAgent(BaseSDLCAgent):
     }
 
     def prior_stages(self) -> List[str]:
-        return ["discovery", "requirements", "architecture", "planning",
-                "development", "quality_gate"]
+        return [
+            "discovery",
+            "requirements",
+            "architecture",
+            "planning",
+            "development",
+            "quality_gate",
+        ]
 
 
 # ---------------------------------------------------------------------------
@@ -426,14 +452,14 @@ class ReleaseManagerAgent(BaseSDLCAgent):
 # ---------------------------------------------------------------------------
 
 AGENT_ROLE_MAP: Dict[str, type] = {
-    "domain_expert":      DomainExpertAgent,
-    "product_owner":      ProductOwnerAgent,
-    "business_analyst":   BusinessAnalystAgent,
-    "architect":          ArchitectAgent,
-    "tech_lead":          TechLeadAgent,
-    "developer_backend":  DeveloperBackendAgent,
-    "developer_ui":       DeveloperUIAgent,
-    "developer_devops":   DeveloperDevOpsAgent,
-    "qa_engineer":        QAEngineerAgent,
-    "release_manager":    ReleaseManagerAgent,
+    "domain_expert": DomainExpertAgent,
+    "product_owner": ProductOwnerAgent,
+    "business_analyst": BusinessAnalystAgent,
+    "architect": ArchitectAgent,
+    "tech_lead": TechLeadAgent,
+    "developer_backend": DeveloperBackendAgent,
+    "developer_ui": DeveloperUIAgent,
+    "developer_devops": DeveloperDevOpsAgent,
+    "qa_engineer": QAEngineerAgent,
+    "release_manager": ReleaseManagerAgent,
 }

@@ -18,7 +18,6 @@ import pytest
 
 from agents.custom_loader import _build_class, _build_class_from_file, load_custom_roles
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -45,9 +44,11 @@ def _write_yaml(tmp_path: Path, name: str, content: str) -> Path:
 # _build_class unit tests
 # ---------------------------------------------------------------------------
 
+
 class TestBuildClass:
     def test_creates_subclass(self):
         from core.agent_base import BaseSDLCAgent
+
         cls = _build_class(_MINIMAL_SPEC)
         assert issubclass(cls, BaseSDLCAgent)
 
@@ -120,6 +121,7 @@ def _make_instance(cls):
     from unittest.mock import MagicMock
     from core.agent_base import AgentConfig
     from core.memory import ArtifactBundle, ProjectMemory
+
     cfg = AgentConfig(role=cls.ROLE)
     pm = MagicMock(spec=ProjectMemory)
     ab = ArtifactBundle("run-test")
@@ -130,6 +132,7 @@ def _make_instance(cls):
 # ---------------------------------------------------------------------------
 # _build_class_from_file
 # ---------------------------------------------------------------------------
+
 
 class TestBuildClassFromFile:
     def test_load_minimal_yaml(self, tmp_path):
@@ -172,6 +175,7 @@ class TestBuildClassFromFile:
 # ---------------------------------------------------------------------------
 # load_custom_roles
 # ---------------------------------------------------------------------------
+
 
 class TestLoadCustomRoles:
     def test_returns_empty_for_missing_dir(self, tmp_path):
@@ -245,10 +249,12 @@ class TestLoadCustomRoles:
         _write_yaml(tmp_path, "pipeline_test_role.yaml", yaml_content)
 
         import agents.custom_loader as cl
+
         original = cl._CUSTOM_ROLES_DIR
         cl._CUSTOM_ROLES_DIR = tmp_path
         try:
             from core.pipeline import SDLCPipeline
+
             pipeline = SDLCPipeline.from_dict({"workspace": str(tmp_path / "out")})
             assert "pipeline_test_role" in pipeline._agent_registry
         finally:

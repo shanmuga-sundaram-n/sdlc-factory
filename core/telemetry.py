@@ -26,11 +26,14 @@ _SETUP_DONE = False
 # No-op fallback — used when opentelemetry-sdk is not installed
 # ---------------------------------------------------------------------------
 
+
 class _NoOpSpan:
     def set_attribute(self, key: str, value: Any) -> None: ...
     def record_exception(self, exc: Exception) -> None: ...
     def set_status(self, *args: Any, **kwargs: Any) -> None: ...
-    def __enter__(self) -> "_NoOpSpan": return self
+    def __enter__(self) -> "_NoOpSpan":
+        return self
+
     def __exit__(self, *args: Any) -> None: ...
 
 
@@ -43,6 +46,7 @@ class _NoOpTracer:
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
+
 
 def _setup_tracer() -> Any:
     """Initialise the OTel tracer once. Returns a real tracer or _NoOpTracer."""
@@ -73,6 +77,7 @@ def _setup_tracer() -> Any:
         if endpoint:
             try:
                 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+
                 provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
                 logger.info("OTel: OTLP exporter → %s", endpoint)
             except ImportError:
@@ -99,6 +104,7 @@ def get_tracer() -> Any:
 # Convenience span helpers
 # ---------------------------------------------------------------------------
 
+
 @contextmanager
 def pipeline_span(run_id: str, idea: str) -> Generator[Any, None, None]:
     """Root span covering the entire pipeline run."""
@@ -110,7 +116,9 @@ def pipeline_span(run_id: str, idea: str) -> Generator[Any, None, None]:
 
 
 @contextmanager
-def stage_span(run_id: str, stage_name: str, *, parallel: bool = False) -> Generator[Any, None, None]:
+def stage_span(
+    run_id: str, stage_name: str, *, parallel: bool = False
+) -> Generator[Any, None, None]:
     """Child span for a single pipeline stage."""
     tracer = get_tracer()
     with tracer.start_as_current_span(f"stage.{stage_name}") as span:

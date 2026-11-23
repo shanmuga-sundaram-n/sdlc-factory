@@ -23,24 +23,20 @@ _UI_DIR = Path(__file__).parent.parent / "ui"
 # Lazy FastAPI import — keeps startup fast when ui extra is not installed
 # ---------------------------------------------------------------------------
 
+
 def _get_app():
     try:
         from fastapi import FastAPI, HTTPException, Body
         from fastapi.responses import HTMLResponse
         from fastapi.middleware.cors import CORSMiddleware
     except ImportError as exc:
-        raise RuntimeError(
-            "Web UI requires the 'ui' extra: uv sync --extra ui"
-        ) from exc
+        raise RuntimeError("Web UI requires the 'ui' extra: uv sync --extra ui") from exc
 
     from core.session import get_default_db
     from core.pipeline import SDLC_STAGES
 
     _STAGE_NAMES = [s.name for s in SDLC_STAGES]
-    _STAGE_META = {
-        s.name: {"parallel": s.parallel, "hitl_gate": s.hitl_gate}
-        for s in SDLC_STAGES
-    }
+    _STAGE_META = {s.name: {"parallel": s.parallel, "hitl_gate": s.hitl_gate} for s in SDLC_STAGES}
 
     app = FastAPI(title="SDLC Factory", version="0.1.0", docs_url="/api/docs")
 
@@ -60,12 +56,12 @@ def _get_app():
 
     def _calc_cost(tokens_in: int, tokens_out: int, model: str) -> float:
         pricing = {
-            "claude-opus-4-8":   (15.0, 75.0),
-            "claude-opus-4-7":   (15.0, 75.0),
-            "claude-sonnet-4-6": (3.0,  15.0),
-            "claude-haiku-4-5":  (0.25,  1.25),
-            "gpt-4o":            (2.5,  10.0),
-            "gpt-4o-mini":       (0.15,  0.60),
+            "claude-opus-4-8": (15.0, 75.0),
+            "claude-opus-4-7": (15.0, 75.0),
+            "claude-sonnet-4-6": (3.0, 15.0),
+            "claude-haiku-4-5": (0.25, 1.25),
+            "gpt-4o": (2.5, 10.0),
+            "gpt-4o-mini": (0.15, 0.60),
         }
         p_in, p_out = pricing.get(model, (3.0, 15.0))
         return (tokens_in / 1_000_000) * p_in + (tokens_out / 1_000_000) * p_out
@@ -93,15 +89,17 @@ def _get_app():
             else:
                 stage_status = "pending"
 
-            stages.append({
-                "name": name,
-                "status": stage_status,
-                "parallel": _STAGE_META[name]["parallel"],
-                "hitl_gate": _STAGE_META[name]["hitl_gate"],
-                "created_at": rec["created_at"] if rec else None,
-                "approved_at": rec["approved_at"] if rec else None,
-                "approved_by": rec["approved_by"] if rec else None,
-            })
+            stages.append(
+                {
+                    "name": name,
+                    "status": stage_status,
+                    "parallel": _STAGE_META[name]["parallel"],
+                    "hitl_gate": _STAGE_META[name]["hitl_gate"],
+                    "created_at": rec["created_at"] if rec else None,
+                    "approved_at": rec["approved_at"] if rec else None,
+                    "approved_by": rec["approved_by"] if rec else None,
+                }
+            )
         return stages
 
     # ------------------------------------------------------------------

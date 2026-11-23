@@ -21,7 +21,6 @@ from unittest.mock import patch
 
 from core.session import PipelineDB
 
-
 # ---------------------------------------------------------------------------
 # Mock LLM — deterministic artifact per role
 # ---------------------------------------------------------------------------
@@ -35,16 +34,25 @@ _ARTIFACTS: dict = {
     },
     "Product Owner": {
         "user_stories": [
-            {"id": "US-001", "title": "Run pipeline", "story": "As a dev...",
-             "priority": "must",
-             "acceptance_criteria": ["Pipeline completes in under 10 minutes"]},
+            {
+                "id": "US-001",
+                "title": "Run pipeline",
+                "story": "As a dev...",
+                "priority": "must",
+                "acceptance_criteria": ["Pipeline completes in under 10 minutes"],
+            },
         ],
         "mvp_stories": ["US-001"],
         "mvp_rationale": "Core functionality.",
     },
     "Business Analyst": {
         "functional_requirements": [
-            {"id": "FR-001", "story_ref": "US-001", "description": "run pipeline", "priority": "must"}
+            {
+                "id": "FR-001",
+                "story_ref": "US-001",
+                "description": "run pipeline",
+                "priority": "must",
+            }
         ],
         "non_functional_requirements": [
             {"id": "NFR-001", "category": "performance", "description": "< 10 min"}
@@ -55,8 +63,14 @@ _ARTIFACTS: dict = {
     },
     "Architect": {
         "adrs": [
-            {"id": "ADR-001", "title": "Use SQLite", "status": "accepted",
-             "context": "need a db", "decision": "SQLite", "consequences": {}}
+            {
+                "id": "ADR-001",
+                "title": "Use SQLite",
+                "status": "accepted",
+                "context": "need a db",
+                "decision": "SQLite",
+                "consequences": {},
+            }
         ],
         "tech_stack": {"backend": "FastAPI", "db": "SQLite"},
         "c4_context": "context diagram",
@@ -64,12 +78,27 @@ _ARTIFACTS: dict = {
     },
     "Tech Lead": {
         "tasks": [
-            {"task_id": "t-001", "title": "Create API", "assignee_role": "developer_backend",
-             "description": "Implement GET /items", "acceptance_criteria": ["Returns 200"]},
-            {"task_id": "t-002", "title": "Create UI", "assignee_role": "developer_ui",
-             "description": "React component", "acceptance_criteria": ["Renders list"]},
-            {"task_id": "t-003", "title": "Create Dockerfile", "assignee_role": "developer_devops",
-             "description": "Write Dockerfile", "acceptance_criteria": ["Image builds"]},
+            {
+                "task_id": "t-001",
+                "title": "Create API",
+                "assignee_role": "developer_backend",
+                "description": "Implement GET /items",
+                "acceptance_criteria": ["Returns 200"],
+            },
+            {
+                "task_id": "t-002",
+                "title": "Create UI",
+                "assignee_role": "developer_ui",
+                "description": "React component",
+                "acceptance_criteria": ["Renders list"],
+            },
+            {
+                "task_id": "t-003",
+                "title": "Create Dockerfile",
+                "assignee_role": "developer_devops",
+                "description": "Write Dockerfile",
+                "acceptance_criteria": ["Image builds"],
+            },
         ],
         "coding_standards": {"max_line_length": 100},
     },
@@ -125,7 +154,9 @@ def _mock_llm(model, base_url, api_key, system, messages, tools, **kwargs):
         if line.startswith("# Role:"):
             role_name = line.replace("# Role:", "").strip()
             break
-    artifact = _ARTIFACTS.get(role_name, {"result": "ok", "files_written": [], "tests_passing": True})
+    artifact = _ARTIFACTS.get(
+        role_name, {"result": "ok", "files_written": [], "tests_passing": True}
+    )
     content = f"Here is my output:\n\n```json\n{json.dumps(artifact)}\n```"
     return {
         "message": {"role": "assistant", "content": content},
@@ -142,8 +173,8 @@ def _auto_config(tmp_path: Path) -> dict:
             "hitl_gates": [
                 {"stage": "requirements", "mode": "auto", "max_open_questions": 0},
                 {"stage": "architecture", "mode": "auto"},
-                {"stage": "quality_gate",  "mode": "auto", "coverage_threshold": 80},
-                {"stage": "delivery",      "mode": "auto"},
+                {"stage": "quality_gate", "mode": "auto", "coverage_threshold": 80},
+                {"stage": "delivery", "mode": "auto"},
             ],
         },
         "pipeline": {"model": "claude-sonnet-4-6"},
@@ -154,11 +185,13 @@ def _auto_config(tmp_path: Path) -> dict:
 # Full pipeline E2E
 # ---------------------------------------------------------------------------
 
+
 class TestFullPipelineE2E:
     @patch("core.agent_runtime.call_model_openai", side_effect=_mock_llm)
     def test_pipeline_completes(self, mock_model, tmp_path):
         db = PipelineDB(tmp_path / "pipeline.db")
         from core.pipeline import SDLCPipeline
+
         pipeline = SDLCPipeline.from_dict(_auto_config(tmp_path), db=db)
         result = pipeline.run("Build a simple REST API")
         assert result["status"] == "completed"
@@ -167,6 +200,7 @@ class TestFullPipelineE2E:
     def test_all_stage_artifacts_persisted(self, mock_model, tmp_path):
         db = PipelineDB(tmp_path / "pipeline.db")
         from core.pipeline import SDLCPipeline, SDLC_STAGES
+
         pipeline = SDLCPipeline.from_dict(_auto_config(tmp_path), db=db)
         result = pipeline.run("Build a REST API")
         run_id = result["run_id"]
@@ -179,6 +213,7 @@ class TestFullPipelineE2E:
     def test_hitl_gated_stages_in_audit_log(self, mock_model, tmp_path):
         db = PipelineDB(tmp_path / "pipeline.db")
         from core.pipeline import SDLCPipeline, SDLC_STAGES
+
         pipeline = SDLCPipeline.from_dict(_auto_config(tmp_path), db=db)
         result = pipeline.run("Build a REST API")
         run_id = result["run_id"]
@@ -186,41 +221,47 @@ class TestFullPipelineE2E:
         audit = db.get_audit_log(run_id)
         gated_stages = {s.name for s in SDLC_STAGES if s.hitl_gate}
         audited_stages = {e["stage"] for e in audit}
-        assert gated_stages.issubset(audited_stages), (
-            f"Missing audit entries for: {gated_stages - audited_stages}"
-        )
+        assert gated_stages.issubset(
+            audited_stages
+        ), f"Missing audit entries for: {gated_stages - audited_stages}"
 
     @patch("core.agent_runtime.call_model_openai", side_effect=_mock_llm)
     def test_all_hitl_decisions_approved(self, mock_model, tmp_path):
         db = PipelineDB(tmp_path / "pipeline.db")
         from core.pipeline import SDLCPipeline
+
         pipeline = SDLCPipeline.from_dict(_auto_config(tmp_path), db=db)
         result = pipeline.run("Build a REST API")
         run_id = result["run_id"]
 
         audit = db.get_audit_log(run_id)
         for entry in audit:
-            assert entry["decision"] == "APPROVED", (
-                f"Stage {entry['stage']} was {entry['decision']}: {entry['rationale']}"
-            )
+            assert (
+                entry["decision"] == "APPROVED"
+            ), f"Stage {entry['stage']} was {entry['decision']}: {entry['rationale']}"
 
     @patch("core.agent_runtime.call_model_openai", side_effect=_mock_llm)
     def test_kanban_tasks_created_for_development(self, mock_model, tmp_path):
         db = PipelineDB(tmp_path / "pipeline.db")
         from core.pipeline import SDLCPipeline
+
         pipeline = SDLCPipeline.from_dict(_auto_config(tmp_path), db=db)
         result = pipeline.run("Build a REST API")
         run_id = result["run_id"]
 
         tasks = db.list_tasks(run_id)
-        dev_tasks = [t for t in tasks if t["assignee"] in
-                     ("developer_backend", "developer_ui", "developer_devops")]
+        dev_tasks = [
+            t
+            for t in tasks
+            if t["assignee"] in ("developer_backend", "developer_ui", "developer_devops")
+        ]
         assert len(dev_tasks) >= 3, f"Expected ≥3 dev tasks, got {len(dev_tasks)}"
 
     @patch("core.agent_runtime.call_model_openai", side_effect=_mock_llm)
     def test_token_usage_recorded_for_every_stage(self, mock_model, tmp_path):
         db = PipelineDB(tmp_path / "pipeline.db")
         from core.pipeline import SDLCPipeline, SDLC_STAGES
+
         pipeline = SDLCPipeline.from_dict(_auto_config(tmp_path), db=db)
         result = pipeline.run("Build a REST API")
         run_id = result["run_id"]
@@ -229,14 +270,13 @@ class TestFullPipelineE2E:
         recorded_stages = {r["stage"] for r in token_rows}
 
         for stage in SDLC_STAGES:
-            assert stage.name in recorded_stages, (
-                f"No token data for stage {stage.name}"
-            )
+            assert stage.name in recorded_stages, f"No token data for stage {stage.name}"
 
     @patch("core.agent_runtime.call_model_openai", side_effect=_mock_llm)
     def test_token_counts_are_positive(self, mock_model, tmp_path):
         db = PipelineDB(tmp_path / "pipeline.db")
         from core.pipeline import SDLCPipeline
+
         pipeline = SDLCPipeline.from_dict(_auto_config(tmp_path), db=db)
         result = pipeline.run("Build a REST API")
         run_id = result["run_id"]
@@ -250,6 +290,7 @@ class TestFullPipelineE2E:
     def test_delivery_artifact_has_required_fields(self, mock_model, tmp_path):
         db = PipelineDB(tmp_path / "pipeline.db")
         from core.pipeline import SDLCPipeline
+
         pipeline = SDLCPipeline.from_dict(_auto_config(tmp_path), db=db)
         result = pipeline.run("Build a REST API")
         run_id = result["run_id"]
@@ -266,6 +307,7 @@ class TestFullPipelineE2E:
     def test_workspace_directory_created(self, mock_model, tmp_path):
         db = PipelineDB(tmp_path / "pipeline.db")
         from core.pipeline import SDLCPipeline
+
         pipeline = SDLCPipeline.from_dict(_auto_config(tmp_path), db=db)
         result = pipeline.run("Build a REST API")
         run_id = result["run_id"]
@@ -277,6 +319,7 @@ class TestFullPipelineE2E:
     def test_run_id_recorded_in_list(self, mock_model, tmp_path):
         db = PipelineDB(tmp_path / "pipeline.db")
         from core.pipeline import SDLCPipeline
+
         pipeline = SDLCPipeline.from_dict(_auto_config(tmp_path), db=db)
         result = pipeline.run("Build a REST API")
         run_id = result["run_id"]
@@ -289,6 +332,7 @@ class TestFullPipelineE2E:
 # Resume E2E — paused run resumes from last approved stage
 # ---------------------------------------------------------------------------
 
+
 class TestResumeE2E:
     @patch("core.agent_runtime.call_model_openai", side_effect=_mock_llm)
     def test_resume_skips_already_approved_stages(self, mock_model, tmp_path):
@@ -300,9 +344,13 @@ class TestResumeE2E:
         # No critical bugs → QALoop skips fix attempts.
         # AutoEvaluator sees coverage_pct=50 < 80% → REJECTED → run pauses.
         failing_qa["QA Engineer"] = {
-            "test_plan": "", "test_suites_run": [],
-            "total_tests": 5, "passing": 3, "failing": 2,
-            "coverage_pct": 50, "failing_tests": [],
+            "test_plan": "",
+            "test_suites_run": [],
+            "total_tests": 5,
+            "passing": 3,
+            "failing": 2,
+            "coverage_pct": 50,
+            "failing_tests": [],
             "bugs": [],
             "acceptance_criteria_coverage": {},
             "gate_passed": False,
@@ -319,9 +367,13 @@ class TestResumeE2E:
                     break
             if role_name == "QA Engineer":
                 qa_called["n"] += 1
-                artifact = failing_qa["QA Engineer"] if qa_called["n"] == 1 else _ARTIFACTS["QA Engineer"]
+                artifact = (
+                    failing_qa["QA Engineer"] if qa_called["n"] == 1 else _ARTIFACTS["QA Engineer"]
+                )
             else:
-                artifact = _ARTIFACTS.get(role_name, {"result": "ok", "files_written": [], "tests_passing": True})
+                artifact = _ARTIFACTS.get(
+                    role_name, {"result": "ok", "files_written": [], "tests_passing": True}
+                )
             content = f"```json\n{json.dumps(artifact)}\n```"
             return {
                 "message": {"role": "assistant", "content": content},
@@ -350,6 +402,7 @@ class TestResumeE2E:
         """Resuming an already-completed run should return completed immediately."""
         db = PipelineDB(tmp_path / "pipeline.db")
         from core.pipeline import SDLCPipeline
+
         pipeline = SDLCPipeline.from_dict(_auto_config(tmp_path), db=db)
         result = pipeline.run("Build a REST API")
         assert result["status"] == "completed"
@@ -364,18 +417,21 @@ class TestResumeE2E:
 # E2E: cmd_cost integration
 # ---------------------------------------------------------------------------
 
+
 class TestCostIntegrationE2E:
     @patch("core.agent_runtime.call_model_openai", side_effect=_mock_llm)
     def test_cost_command_shows_all_stages_after_run(self, mock_model, tmp_path, capsys):
         db = PipelineDB(tmp_path / "pipeline.db")
         from core.pipeline import SDLCPipeline, SDLC_STAGES
         from sdlc import cmd_cost
+
         pipeline = SDLCPipeline.from_dict(_auto_config(tmp_path), db=db)
         result = pipeline.run("Build a REST API")
         run_id = result["run_id"]
 
         with patch("core.session.get_default_db", return_value=db):
             from argparse import Namespace
+
             rc = cmd_cost(Namespace(run_id=run_id))
 
         assert rc == 0

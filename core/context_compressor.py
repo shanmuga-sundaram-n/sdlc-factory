@@ -57,7 +57,8 @@ class ContextCompressor:
 
         logger.info(
             "Context compressor triggered: ~%d estimated tokens (threshold=%d)",
-            estimated, self.threshold_tokens,
+            estimated,
+            self.threshold_tokens,
         )
         try:
             return self._compress(messages, system)
@@ -82,8 +83,8 @@ class ContextCompressor:
         if len(messages) <= self.keep_recent:
             return messages
 
-        to_compress = messages[:-self.keep_recent]
-        recent = messages[-self.keep_recent:]
+        to_compress = messages[: -self.keep_recent]
+        recent = messages[-self.keep_recent :]
 
         # Build summary input — cap at 8k chars to avoid recursive over-length
         lines = []
@@ -112,14 +113,15 @@ class ContextCompressor:
         summary_msg: Dict = {
             "role": "user",
             "content": (
-                f"[CONTEXT SUMMARY — {len(to_compress)} messages compressed]\n\n"
-                f"{summary_text}"
+                f"[CONTEXT SUMMARY — {len(to_compress)} messages compressed]\n\n" f"{summary_text}"
             ),
         }
 
         compressed = [summary_msg] + recent
         logger.info(
             "Compressed %d messages → 1 summary + %d recent (was ~%d tokens)",
-            len(to_compress), len(recent), self._estimate_tokens(messages, system),
+            len(to_compress),
+            len(recent),
+            self._estimate_tokens(messages, system),
         )
         return compressed
