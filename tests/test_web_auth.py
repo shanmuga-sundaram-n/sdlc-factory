@@ -176,6 +176,22 @@ class TestHostAndCors:
         assert "access-control-allow-origin" not in r.headers
 
 
+class TestApiDocs:
+    """The sidebar's 'API Docs' link: the page and its schema must both load."""
+
+    def test_docs_page_and_schema_load_without_the_token(self, client):
+        assert client.get("/api/docs").status_code == 200
+        schema = client.get("/openapi.json")
+        assert schema.status_code == 200
+        paths = schema.json()["paths"]
+        assert "/api/runs" in paths
+        assert "/api/runs/{run_id}/approve" in paths
+
+    def test_schema_describes_routes_but_no_run_data(self, client):
+        body = client.get("/openapi.json").text
+        assert RUN not in body and "an idea" not in body
+
+
 class TestDashboardPage:
     def test_every_api_call_goes_through_the_shared_request_function(self):
         """A raw fetch() would skip the token and the 401 lock screen, so only request() may call it."""

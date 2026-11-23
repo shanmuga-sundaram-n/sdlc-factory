@@ -35,8 +35,8 @@ Known limits:
 - The dashboard page loads React, Babel and Tailwind from third-party CDNs without pinned
   versions or integrity hashes. Those scripts run in the page and can read the key from
   `sessionStorage`. Pinning or vendoring them is a planned follow-up.
-- The API documentation page (`/api/docs`) is served without the key. It describes routes
-  only and exposes no run data.
+- The API documentation page (`/api/docs`) and its schema (`/openapi.json`) are served
+  without the key. They describe routes only and expose no run data.
 - The `Host` check does not match IPv6 literal hosts (`[::1]`); use `127.0.0.1` or
   `localhost`.
 
