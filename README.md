@@ -532,6 +532,17 @@ All HITL decisions are written to `audit_log` and retrievable via `sdlc audit <r
 
 ---
 
+## Security model
+
+SDLC Factory runs LLM agents that write code and run commands on your machine, with your permissions. The guardrails stop accidents; they are **not a sandbox**. In short:
+
+- The dashboard needs a per-launch access key, serves loopback only by default, and has no CORS (see [Access](#access)).
+- Agent shell commands go through an allowlist of 35 command names. Shells, `curl`, `rm` and inline code (`python -c`, `node -e`) are refused, as are absolute, home and `..` path arguments. Extra commands go in `~/.sdlc-factory/terminal_allowlist.yaml`.
+- Agent subprocesses do not see the dashboard key or your provider API keys.
+- Allowed tools such as `make`, `npm run`, `pip install` and `python script.py` still run arbitrary code. Run untrusted ideas in a throwaway VM or container.
+
+Details, known limits and how to report a vulnerability: [SECURITY.md](SECURITY.md).
+
 ## License
 
 MIT
