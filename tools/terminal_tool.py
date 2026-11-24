@@ -1,14 +1,19 @@
 """Terminal (subprocess) tool for developer agents.
 
-Executes shell commands inside the agent's workspace directory.
-The working directory is always inside the workspace — commands cannot
-cd out of it via relative paths.
+Executes commands in the agent's workspace directory. This is a guardrail,
+not a sandbox: allowed commands (make, npm run, pip install, git, pytest,
+python script.py) still run arbitrary code on the host with the user's
+permissions. See SECURITY.md.
 
-Safety constraints:
+What it does:
   - cwd is resolved and verified to be inside the workspace.
+  - tools/command_policy.py refuses commands that are not on the allowlist,
+    shells and network tools, inline code (python -c, node -e), and absolute,
+    home or parent-directory path arguments.
+  - The subprocess gets a scrubbed environment (no dashboard token or API keys).
   - Output is capped at MAX_OUTPUT_BYTES to prevent context flooding.
   - A hard timeout (default 60s) kills the subprocess if it hangs.
-  - The tool does NOT use shell=True to avoid shell injection.
+  - The tool does NOT use shell=True, so there is no shell expansion or chaining.
 
 Registers as: terminal  (toolset="terminal")
 """
@@ -17,11 +22,13 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shlex
 import subprocess
 from typing import Optional
 
 from core.registry import registry, tool_error
+from tools import command_policy
 from tools._context import agent_env, get_workspace, safe_resolve
 
 logger = logging.getLogger(__name__)
@@ -56,6 +63,12 @@ def _terminal(command: str, cwd: Optional[str] = None, timeout: int = 60) -> str
 
     if not args:
         return tool_error("Empty command")
+
+    cwd_rel = os.path.relpath(run_dir, workspace.resolve())
+    policy_error = command_policy.check(args, cwd_rel)
+    if policy_error:
+        logger.warning("terminal refused: %s (%s)", command, policy_error)
+        return tool_error(policy_error)
 
     logger.info("terminal: %s (cwd=%s timeout=%ds)", command, run_dir, timeout)
 

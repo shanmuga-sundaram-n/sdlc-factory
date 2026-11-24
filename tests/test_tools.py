@@ -185,9 +185,9 @@ class TestTerminalTool:
         _set_ws(tmp_path)
         from tools.terminal_tool import _terminal
 
-        result = json.loads(_terminal("sh -c 'echo err >&2; exit 1'"))
-        assert "err" in result["stderr"]
-        assert result["returncode"] == 1
+        result = json.loads(_terminal("ls no_such_file_here"))
+        assert "no_such_file_here" in result["stderr"]
+        assert result["returncode"] != 0
 
     def test_custom_cwd(self, tmp_path):
         _set_ws(tmp_path)

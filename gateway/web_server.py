@@ -253,7 +253,11 @@ def _get_app():
 
     @app.get("/", response_class=HTMLResponse)
     @app.get("/{full_path:path}", response_class=HTMLResponse)
-    def spa(full_path: str = "") -> HTMLResponse:
+    def spa(full_path: str = ""):
+        # No return annotation on purpose: this module uses `from __future__ import
+        # annotations` and HTMLResponse is imported inside _get_app(), so the string
+        # annotation cannot be resolved and /openapi.json (and so /api/docs) crashed.
+        # response_class above already tells FastAPI what this route returns.
         # API routes are handled before this catch-all
         if full_path.startswith("api/"):
             raise HTTPException(status_code=404)
